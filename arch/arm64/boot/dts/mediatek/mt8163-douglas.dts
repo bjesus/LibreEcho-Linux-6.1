@@ -337,6 +337,8 @@
 		toprgu: watchdog@10007000 {
 			compatible = "mediatek,mt8163-rgu";
 			reg = <0x0 0x10007000 0x0 0x1000>;
+			/* bark IRQ, SPI 128 (vendor DT says edge, GICv2 only takes level): pretimeout -> panic -> pstore */
+			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_LOW>;
 			#reset-cells = <1>;
 		};
 

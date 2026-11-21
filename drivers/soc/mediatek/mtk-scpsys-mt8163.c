@@ -446,6 +446,13 @@ static int __init scpsys_probe(struct platform_device *pdev)
 		 */
 		genpd->power_on(genpd);
 
+		/*
+		 * douglas: the DSI controller runs on configuration inherited from
+		 * the bootloader (see mtk_dsi.c); if this domain is powered off at
+		 * system suspend that state is lost and the panel never comes back.
+		 */
+		if (i == MT8163_POWER_DOMAIN_DISP)
+			genpd->flags |= GENPD_FLAG_ALWAYS_ON;
 		pm_genpd_init(genpd, NULL, false);
 	}
 
