@@ -266,17 +266,47 @@ static void mtk_bt_hci_receive(const UINT8 *data, INT32 size)
 	mtk_hci.hdev->stat.byte_rx += size;
 }
 
-static int mtk_bt_hci_init(void)
+/*
+ * hci_register_dev() immediately queues the core's setup power-on, which opens
+ * the device.  On MT8163 the STP/WMT transport only becomes ready after the
+ * userspace WMT launcher has loaded the firmware patches, so an early
+ * registration always fails that first open and leaves HCI_SETUP pending
+ * (mgmt never announces the controller; bluetoothd sees nothing).  Poll for the
+ * transport and register only once it is ready, then let the core do its
+ * normal power-on.
+ */
+static struct delayed_work mtk_hci_reg_work;
+static int mtk_hci_reg_tries;
+
+static void mtk_bt_hci_reg_work(struct work_struct *work)
 {
 	int result;
 
+	if (mtk_wcn_stp_is_ready() != MTK_WCN_BOOL_TRUE) {
+		if (++mtk_hci_reg_tries < 600) {	/* up to 5 min */
+			schedule_delayed_work(&mtk_hci_reg_work, msecs_to_jiffies(500));
+			return;
+		}
+		pr_err("ECHO_BT_HCI: STP never became ready, HCI not registered\n");
+		return;
+	}
+	pr_info("ECHO_BT_HCI: STP ready after %d polls, registering hci\n", mtk_hci_reg_tries);
+	result = hci_register_dev(mtk_hci.hdev);
+	if (result) {
+		pr_err("ECHO_BT_HCI: hci_register_dev failed %d\n", result);
+		hci_free_dev(mtk_hci.hdev);
+		mtk_hci.hdev = NULL;
+	}
+}
+
+static int mtk_bt_hci_init(void)
+{
 	mtk_hci.hdev = hci_alloc_dev();
 	if (!mtk_hci.hdev)
 		return -ENOMEM;
 
 	mtk_hci.hdev->bus = HCI_VIRTUAL;
 	mtk_hci.hdev->dev_type = HCI_PRIMARY;
-	set_bit(HCI_QUIRK_DEFERRED_SETUP, &mtk_hci.hdev->quirks);
 	/* The MT8163 BTIF firmware advertises extended LMP features but returns
 	 * a non-success status for Read Local Extended Features.  Those optional
 	 * pages are not needed for the BR/EDR transport used by this board. */
@@ -291,24 +321,10 @@ static int mtk_bt_hci_init(void)
 	hci_set_drvdata(mtk_hci.hdev, &mtk_hci);
 	skb_queue_head_init(&mtk_hci.txq);
 	INIT_DELAYED_WORK(&mtk_hci.work, mtk_bt_hci_work);
-	result = hci_register_dev(mtk_hci.hdev);
-	if (result) {
-		mtk_wcn_stp_register_if_rx(NULL);
-		cancel_delayed_work_sync(&mtk_hci.work);
-		skb_queue_purge(&mtk_hci.txq);
-		hci_free_dev(mtk_hci.hdev);
-		mtk_hci.hdev = NULL;
-	} else {
-		/* hci_register_dev() queues an immediate setup power-on.  The
-		 * MT8163 WMT callback is registered later in boot, so that
-		 * implicit open always races WMT and leaves HCI_SETUP pending
-		 * after failing.  Keep the controller registered but defer its
-		 * first open to the explicit management enable request, after
-		 * wmt_configure has installed the BTIF transport. */
-		cancel_work_sync(&mtk_hci.hdev->power_on);
-		hci_dev_clear_flag(mtk_hci.hdev, HCI_AUTO_OFF);
-	}
-	return result;
+	INIT_DELAYED_WORK(&mtk_hci_reg_work, mtk_bt_hci_reg_work);
+	mtk_hci_reg_tries = 0;
+	schedule_delayed_work(&mtk_hci_reg_work, msecs_to_jiffies(2000));
+	return 0;
 }
 
 static void mtk_bt_hci_exit(void)
@@ -316,10 +332,12 @@ static void mtk_bt_hci_exit(void)
 	if (!mtk_hci.hdev)
 		return;
 
+	cancel_delayed_work_sync(&mtk_hci_reg_work);
 	mtk_wcn_stp_register_if_rx(NULL);
 	cancel_delayed_work_sync(&mtk_hci.work);
 	skb_queue_purge(&mtk_hci.txq);
-	hci_unregister_dev(mtk_hci.hdev);
+	if (mtk_hci.hdev->flags & (1 << HCI_UP) || mtk_hci_reg_tries < 600)
+		hci_unregister_dev(mtk_hci.hdev);
 	hci_free_dev(mtk_hci.hdev);
 	mtk_hci.hdev = NULL;
 }
