@@ -4,6 +4,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/of.h>
 #include <linux/dma-mapping.h>
 #include <linux/mailbox_controller.h>
 #include <linux/pm_runtime.h>
@@ -344,6 +345,12 @@ ddp_cmdq_cb_out:
 }
 #endif
 
+static bool mtk_crtc_comp_is_dsi(struct mtk_ddp_comp *comp)
+{
+	return comp->dev && comp->dev->of_node &&
+	       of_device_is_compatible(comp->dev->of_node, "mediatek,mt8173-dsi");
+}
+
 static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
 {
 	struct drm_crtc *crtc = &mtk_crtc->base;
@@ -400,6 +407,14 @@ static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
 	 */
 	mtk_ddp_comp_config(mtk_crtc->ddp_comp[0], width, height, vrefresh, bpc, NULL);
 	mtk_ddp_comp_start(mtk_crtc->ddp_comp[0]);
+	/*
+	 * Hold a DSI power reference for the lifetime of the CRTC so the bridge's
+	 * post_disable (which runs before the CRTC's final vblank wait) does not
+	 * gate the DSI clocks; hw_fini drops it after that wait.
+	 */
+	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
+		if (mtk_crtc_comp_is_dsi(mtk_crtc->ddp_comp[i]))
+			mtk_ddp_comp_start(mtk_crtc->ddp_comp[i]);
 
 	/* Initially configure all planes */
 	for (i = 0; i < mtk_crtc->layer_nr; i++) {
@@ -432,7 +447,11 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
 	struct drm_device *drm = mtk_crtc->base.dev;
 	struct drm_crtc *crtc = &mtk_crtc->base;
 	unsigned long flags;
+	int i;
 
+	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
+		if (mtk_crtc_comp_is_dsi(mtk_crtc->ddp_comp[i]))
+			mtk_ddp_comp_stop(mtk_crtc->ddp_comp[i]);
 	mtk_crtc_ddp_clk_disable(mtk_crtc);
 	mtk_mutex_unprepare(mtk_crtc->mutex);
 
