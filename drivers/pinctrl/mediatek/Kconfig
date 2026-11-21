@@ -74,7 +74,7 @@ config PINCTRL_MT8135
 
 config PINCTRL_MT8163
 	bool "Mediatek MT8163 pin control"
-	depends on MACH_MT8163 || COMPILE_TEST
+	depends on MACH_MT8163 || ARCH_MEDIATEK || COMPILE_TEST
 	depends on OF
 	default MACH_MT8163
 	select PINCTRL_MTK

@@ -2890,7 +2890,7 @@ VOID qmProcessPktWithReordering(IN P_ADAPTER_T prAdapter, IN P_SW_RFB_T prSwRfb,
 	prReorderQueParm = ((prStaRec->aprRxReorderParamRefTbl)[prSwRfb->ucTid]);
 	if (!prReorderQueParm) {
 		/* TODO: (Tehuang) Handle the Host-FW sync issue. */
-		prSwRfb->eDst = RX_PKT_DESTINATION_NULL;
+		prSwRfb->eDst = RX_PKT_DESTINATION_HOST;
 		QUEUE_INSERT_TAIL(prReturnedQue, (P_QUE_ENTRY_T) prSwRfb);
 		DBGLOG(QM, WARN, "Reordering for a NULL ReorderQueParm\n");
 		/* ASSERT(0); */

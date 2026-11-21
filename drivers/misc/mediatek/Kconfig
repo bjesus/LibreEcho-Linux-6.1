@@ -2,7 +2,7 @@
 
 config MTK_MT8163_CONSYS
 	bool "MediaTek MT8163 integrated CONSYS connectivity"
-	depends on ARM && ARCH_MEDIATEK && OF && HAS_IOMEM
+	depends on (ARM || ARM64) && ARCH_MEDIATEK && OF && HAS_IOMEM
 	depends on NET && RFKILL
 	select CFG80211
 	select CRC32

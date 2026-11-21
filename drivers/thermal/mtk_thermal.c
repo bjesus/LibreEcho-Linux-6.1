@@ -32,6 +32,8 @@
 #define AUXADC_DATA(channel)	(0x14 + (channel) * 4)
 
 #define APMIXED_SYS_TS_CON1	0x604
+/* TS_CON1[5:4] = RG_TS2AUXADC; 2'b00 = buffer on, TSMCU routed to AUXADC */
+#define TS_CON1_TS2AUXADC_MASK	GENMASK(5, 4)
 
 /* Thermal Controller Registers */
 #define TEMP_MONCTL0		0x000
@@ -282,6 +284,12 @@ struct mtk_thermal_data {
 	const int num_controller;
 	const int *controller_offset;
 	bool need_switch_bank;
+	/*
+	 * Some V1 SoCs (MT8163) come out of the bootloader with the
+	 * temperature sensor buffer disabled, so every TEMP_MSRx reads 0.
+	 * See mtk_thermal_ts2auxadc_on().
+	 */
+	bool enable_ts2auxadc;
 	struct thermal_bank_cfg bank_data[MAX_NUM_ZONES];
 	enum mtk_thermal_version version;
 };
@@ -351,10 +359,11 @@ static const int mt8173_vts_index[MT8173_NUM_SENSORS] = {
 	VTS1, VTS2, VTS3, VTS4, VTSABB
 };
 
+/* Vendor mtk_ts_cpu.c banks: CPU = TS1+TS2, GPU = TS2, SOC = TS3. TS4/TSABB have no fuse data. */
 static const int mt8163_bank_data[MT8163_NUM_ZONES][4] = {
 	{ MT8163_TS1, MT8163_TS2 },
-	{ MT8163_TS3, MT8163_TSABB },
-	{ MT8163_TS4, MT8163_TS2, MT8163_TS3, MT8163_TSABB },
+	{ MT8163_TS2 },
+	{ MT8163_TS3 },
 };
 
 static const int mt8163_msr[MT8163_NUM_SENSORS_PER_ZONE] = {
@@ -477,16 +486,17 @@ static const struct mtk_thermal_data mt8163_thermal_data = {
 			.num_sensors = 2,
 			.sensors = mt8163_bank_data[0],
 		}, {
-			.num_sensors = 2,
+			.num_sensors = 1,
 			.sensors = mt8163_bank_data[1],
 		}, {
-			.num_sensors = 4,
+			.num_sensors = 1,
 			.sensors = mt8163_bank_data[2],
 		},
 	},
 	.msr = mt8163_msr,
 	.adcpnp = mt8163_adcpnp,
 	.sensor_mux_values = mt8163_mux_values,
+	.enable_ts2auxadc = true,
 	.version = MTK_THERMAL_V1,
 };
 
@@ -967,15 +977,27 @@ static int mtk_thermal_get_calibration_data(struct device *dev,
 	if (IS_ERR(cell)) {
 		if (PTR_ERR(cell) == -EPROBE_DEFER)
 			return PTR_ERR(cell);
-		return 0;
+		/*
+		 * No efuse/nvmem provider: allow the three raw calibration
+		 * words to be given directly (e.g. copied from the bootloader's
+		 * "atag,devinfo" data[7..9] on Amazon douglas, whose efuse is
+		 * not memory-mapped).
+		 */
+		buf = kcalloc(3, sizeof(u32), GFP_KERNEL);
+		if (!buf)
+			return -ENOMEM;
+		if (of_property_read_u32_array(dev->of_node, "mediatek,calibration-data", buf, 3)) {
+			kfree(buf);
+			return 0;
+		}
+		dev_info(dev, "using DT calibration data %08x %08x %08x\n", buf[0], buf[1], buf[2]);
+		len = 3 * sizeof(u32);
+	} else {
+		buf = (u32 *)nvmem_cell_read(cell, &len);
+		nvmem_cell_put(cell);
+		if (IS_ERR(buf))
+			return PTR_ERR(buf);
 	}
-
-	buf = (u32 *)nvmem_cell_read(cell, &len);
-
-	nvmem_cell_put(cell);
-
-	if (IS_ERR(buf))
-		return PTR_ERR(buf);
 
 	if (len < 3 * sizeof(u32)) {
 		dev_warn(dev, "invalid calibration data\n");
@@ -1027,6 +1049,32 @@ static const struct of_device_id mtk_thermal_of_match[] = {
 	},
 };
 MODULE_DEVICE_TABLE(of, mtk_thermal_of_match);
+
+/*
+ * Enable the temperature sensor buffer on V1 controllers whose bootloader
+ * leaves it off. MT8163 boots with TS_CON1 = 0x10 (RG_TS2AUXADC = 2'b01), and
+ * every TEMP_MSRx then reads back 0. Amazon's own MT8163 driver turns it on by
+ * clearing just those two bits and waiting:
+ *
+ *	temp = DRV_Reg32(TS_CON1);
+ *	temp &= ~(0x00000030);	// TS_CON1[5:4]=2'b00: Buffer on, TSMCU to AUXADC
+ *	THERMAL_WRAP_WR32(temp, TS_CON1);
+ *	// RG_TS2AUXADC < set from 2'b11 to 2'b00 when resume.
+ *	// wait 100uS than turn on thermal controller.
+ *	udelay(200);
+ *
+ * mtk_thermal_turn_on_buffer() below does the equivalent but is V2-only and
+ * also rewrites TS_CON1[2:0], so keep this faithful to the vendor for V1.
+ */
+static void mtk_thermal_ts2auxadc_on(void __iomem *apmixed_base)
+{
+	u32 tmp;
+
+	tmp = readl(apmixed_base + APMIXED_SYS_TS_CON1);
+	tmp &= ~TS_CON1_TS2AUXADC_MASK;
+	writel(tmp, apmixed_base + APMIXED_SYS_TS_CON1);
+	udelay(200);
+}
 
 static void mtk_thermal_turn_on_buffer(void __iomem *apmixed_base)
 {
@@ -1138,6 +1186,8 @@ static int mtk_thermal_probe(struct platform_device *pdev)
 	if (mt->conf->version == MTK_THERMAL_V2) {
 		mtk_thermal_turn_on_buffer(apmixed_base);
 		mtk_thermal_release_periodic_ts(mt, auxadc_base);
+	} else if (mt->conf->enable_ts2auxadc) {
+		mtk_thermal_ts2auxadc_on(apmixed_base);
 	}
 
 	for (ctrl_id = 0; ctrl_id < mt->conf->num_controller ; ctrl_id++)

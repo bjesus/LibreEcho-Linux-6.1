@@ -1182,7 +1182,7 @@ static void __init mtk_mmsys_init(struct device_node *node)
 		pr_err("%s(): could not register clock provider: %d\n",
 			__func__, r);
 }
-CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt8163-mmsys", mtk_mmsys_init);
+CLK_OF_DECLARE_DRIVER(mtk_mmsys, "mediatek,mt8163-mmsys", mtk_mmsys_init);
 
 static void __init mtk_vdecsys_init(struct device_node *node)
 {

@@ -9,6 +9,7 @@
 #define pr_fmt(fmt) "psci: " fmt
 
 #include <linux/init.h>
+#include <linux/io.h>
 #include <linux/of.h>
 #include <linux/smp.h>
 #include <linux/delay.h>
@@ -36,12 +37,78 @@ static int __init cpu_psci_cpu_prepare(unsigned int cpu)
 	return 0;
 }
 
+static void mt8163_spm_cpu_power_on(unsigned int cpu)
+{
+	static void __iomem *spm;
+	static const u32 pwr_con_offs[4] = { 0x0200, 0x0218, 0x021c, 0x0220 };
+	static const u32 l1_pdn_offs[4]  = { 0x025c, 0x0264, 0x026c, 0x0274 };
+	static const u32 sta_bits[4]     = { BIT(9), BIT(10), BIT(11), BIT(12) };
+	u32 pwr_con, l1_pdn, sta;
+	int to;
+
+	if (cpu == 0 || cpu >= 4)
+		return;
+
+	if (!spm) {
+		spm = ioremap(0x10006000, 0x1000);
+		if (!spm) {
+			pr_err("mt8163-smp: failed to ioremap SPM\n");
+			return;
+		}
+	}
+
+	pwr_con = pwr_con_offs[cpu];
+	l1_pdn = l1_pdn_offs[cpu];
+	sta = sta_bits[cpu];
+
+	/* Enable SPM register control */
+	writel((0x0b16U << 16) | BIT(0), spm + 0x0000);
+
+	writel(readl(spm + pwr_con) | BIT(2), spm + pwr_con);	/* PWR_ON */
+	udelay(1);
+	writel(readl(spm + pwr_con) | BIT(3), spm + pwr_con);	/* PWR_ON_2ND */
+
+	for (to = 10000; to > 0; to--) {
+		if ((readl(spm + 0x060c) & sta) && (readl(spm + 0x0610) & sta))
+			break;
+		udelay(1);
+	}
+	if (!to) {
+		pr_err("mt8163-smp: CPU%u PWR_STATUS timeout\n", cpu);
+		return;
+	}
+
+	writel(readl(spm + pwr_con) & ~BIT(1), spm + pwr_con);	/* ~PWR_ISO */
+	writel(readl(spm + l1_pdn) & ~BIT(0), spm + l1_pdn);	/* ~L1_PDN */
+
+	for (to = 10000; to > 0; to--) {
+		if ((readl(spm + l1_pdn) & BIT(8)) == 0)	/* L1_PDN_ACK */
+			break;
+		udelay(1);
+	}
+	if (!to) {
+		pr_err("mt8163-smp: CPU%u L1_PDN_ACK timeout\n", cpu);
+		return;
+	}
+
+	udelay(1);
+	writel(readl(spm + pwr_con) | BIT(6), spm + pwr_con);	/* SRAM_ISOINT_B */
+	writel(readl(spm + pwr_con) & ~BIT(5), spm + pwr_con);	/* ~SRAM_CKISO */
+	writel(readl(spm + pwr_con) & ~BIT(4), spm + pwr_con);	/* ~PWR_CLK_DIS */
+	writel(readl(spm + pwr_con) | BIT(0), spm + pwr_con);	/* PWR_RST_B */
+
+	pr_info("mt8163-smp: powered on CPU%u via SPM\n", cpu);
+}
+
 static int cpu_psci_cpu_boot(unsigned int cpu)
 {
 	phys_addr_t pa_secondary_entry = __pa_symbol(secondary_entry);
 	int err = psci_ops.cpu_on(cpu_logical_map(cpu), pa_secondary_entry);
 	if (err)
 		pr_err("failed to boot CPU%d (%d)\n", cpu, err);
+
+	if (!err && of_machine_is_compatible("amazon,douglas"))
+		mt8163_spm_cpu_power_on(cpu);
 
 	return err;
 }

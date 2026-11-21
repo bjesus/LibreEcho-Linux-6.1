@@ -693,8 +693,8 @@ static INT32 wmt_plat_gps_lna_ctrl(ENUM_PIN_STATE state)
 	WMT_PLAT_DBG_FUNC("ENTER++\n");
 	consys_pinctrl = mtk_wcn_consys_get_pinctrl();
 	if (NULL == consys_pinctrl) {
-		WMT_PLAT_ERR_FUNC("get consys pinctrl fail\n");
-		return -1;
+		WMT_PLAT_WARN_FUNC("No consys pinctrl, skipping GPS LNA ctrl\n");
+		return 0;
 	}
 
 	gps_lna_init = pinctrl_lookup_state(consys_pinctrl, "gps_lna_state_init");

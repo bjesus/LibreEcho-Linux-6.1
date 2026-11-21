@@ -775,7 +775,8 @@ int goodix_reset_no_int_sync(struct goodix_ts_data *ts)
 	 * power. Only do this in the non ACPI case since some ACPI boards
 	 * don't have a pull-up, so there the reset pin must stay active-high.
 	 */
-	if (ts->irq_pin_access_method == IRQ_PIN_ACCESS_GPIO) {
+	if (ts->irq_pin_access_method == IRQ_PIN_ACCESS_GPIO &&
+	    !of_machine_is_compatible("amazon,douglas")) {
 		error = gpiod_direction_input(ts->gpiod_rst);
 		if (error)
 			goto error;
@@ -1360,6 +1361,8 @@ static int goodix_ts_probe(struct i2c_client *client,
 					 goodix_disable_regulators, ts);
 	if (error)
 		return error;
+
+	msleep(10);
 
 reset:
 	if (ts->reset_controller_at_probe) {

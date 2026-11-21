@@ -87,6 +87,11 @@ $(obj)/vdso32-wrap.o: $(obj)/vdso32/vdso.so
 
 obj-y					+= probes/
 obj-y					+= head.o
+obj-y					+= dtb_builtin.o
+
+# built-in douglas DTB (built before this object; path passed via -D)
+$(obj)/dtb_builtin.o: $(objtree)/arch/arm64/boot/dts/mediatek/mt8163-douglas.dtb
+AFLAGS_dtb_builtin.o			+= -DDTB_PATH=\"$(objtree)/arch/arm64/boot/dts/mediatek/mt8163-douglas.dtb\"
 extra-y					+= vmlinux.lds
 
 ifeq ($(CONFIG_DEBUG_EFI),y)

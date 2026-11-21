@@ -394,25 +394,12 @@ static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
 		goto err_mutex_unprepare;
 	}
 
-	for (i = 0; i < mtk_crtc->ddp_comp_nr - 1; i++) {
-		mtk_mmsys_ddp_connect(mtk_crtc->mmsys_dev,
-				      mtk_crtc->ddp_comp[i]->id,
-				      mtk_crtc->ddp_comp[i + 1]->id);
-		mtk_mutex_add_comp(mtk_crtc->mutex,
-					mtk_crtc->ddp_comp[i]->id);
-	}
-	mtk_mutex_add_comp(mtk_crtc->mutex, mtk_crtc->ddp_comp[i]->id);
-	mtk_mutex_enable(mtk_crtc->mutex);
-
-	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++) {
-		struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[i];
-
-		if (i == 1)
-			mtk_ddp_comp_bgclr_in_on(comp);
-
-		mtk_ddp_comp_config(comp, width, height, vrefresh, bpc, NULL);
-		mtk_ddp_comp_start(comp);
-	}
+	/*
+	 * Preserve LK's active 60Hz MMSYS/MUTEX/COLOR0..DSI0 scanout pipeline
+	 * on MT8163 Douglas; only configure OVL0 planes.
+	 */
+	mtk_ddp_comp_config(mtk_crtc->ddp_comp[0], width, height, vrefresh, bpc, NULL);
+	mtk_ddp_comp_start(mtk_crtc->ddp_comp[0]);
 
 	/* Initially configure all planes */
 	for (i = 0; i < mtk_crtc->layer_nr; i++) {
@@ -445,26 +432,7 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
 	struct drm_device *drm = mtk_crtc->base.dev;
 	struct drm_crtc *crtc = &mtk_crtc->base;
 	unsigned long flags;
-	int i;
 
-	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++) {
-		mtk_ddp_comp_stop(mtk_crtc->ddp_comp[i]);
-		if (i == 1)
-			mtk_ddp_comp_bgclr_in_off(mtk_crtc->ddp_comp[i]);
-	}
-
-	for (i = 0; i < mtk_crtc->ddp_comp_nr; i++)
-		mtk_mutex_remove_comp(mtk_crtc->mutex,
-					   mtk_crtc->ddp_comp[i]->id);
-	mtk_mutex_disable(mtk_crtc->mutex);
-	for (i = 0; i < mtk_crtc->ddp_comp_nr - 1; i++) {
-		mtk_mmsys_ddp_disconnect(mtk_crtc->mmsys_dev,
-					 mtk_crtc->ddp_comp[i]->id,
-					 mtk_crtc->ddp_comp[i + 1]->id);
-		mtk_mutex_remove_comp(mtk_crtc->mutex,
-					   mtk_crtc->ddp_comp[i]->id);
-	}
-	mtk_mutex_remove_comp(mtk_crtc->mutex, mtk_crtc->ddp_comp[i]->id);
 	mtk_crtc_ddp_clk_disable(mtk_crtc);
 	mtk_mutex_unprepare(mtk_crtc->mutex);
 

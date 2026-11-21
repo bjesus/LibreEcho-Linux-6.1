@@ -30,7 +30,7 @@
 #endif /* defined(CONFIG_MTK_CLKMGR) */
 #include <linux/pinctrl/consumer.h>
 #include <linux/delay.h>
-#include <asm/memblock.h>
+#include <linux/memblock.h>
 #include "osal_typedef.h"
 #include "mtk_wcn_consys_hw.h"
 
@@ -330,9 +330,8 @@ static INT32 mtk_wmt_probe(struct platform_device *pdev)
 #if !defined(CONFIG_MTK_GPIO_LEGACY)
 	consys_pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR(consys_pinctrl)) {
-		ret = PTR_ERR(consys_pinctrl);
-		WMT_PLAT_ERR_FUNC("CanNot find consys pinctrl. ret=%d\n", ret);
-		return PTR_ERR(consys_pinctrl);
+		WMT_PLAT_WARN_FUNC("No consys pinctrl, continuing without it\n");
+		consys_pinctrl = NULL;
 	}
 #endif /* !defined(CONFIG_MTK_GPIO_LEGACY) */
 
@@ -434,18 +433,20 @@ INT32 mtk_wcn_consys_hw_reg_ctrl(UINT32 on, UINT32 co_clock_type)
 				WMT_PLAT_ERR_FUNC("enable VCN18 fail\n");
 			else
 				WMT_PLAT_DBG_FUNC("enable VCN18 ok\n");
-			{
+			if (consys_pinctrl) {
 				struct pinctrl_state *pinctrl_wifi_reset;
 
 				pinctrl_wifi_reset =
 					pinctrl_lookup_state(consys_pinctrl,
 							"wifi_reset_init");
 				if (IS_ERR(pinctrl_wifi_reset)) {
-					pr_debug("[%s]Cannot find wifi_reset state.\n",
-						__func__);
-				} else
+					WMT_PLAT_ERR_FUNC("ECHO_CONSYS: Cannot find wifi_reset_init state (%ld)\n",
+						PTR_ERR(pinctrl_wifi_reset));
+				} else {
 					pinctrl_select_state(consys_pinctrl,
 							pinctrl_wifi_reset);
+					WMT_PLAT_ERR_FUNC("ECHO_CONSYS: selected wifi_reset_init pinctrl OK\n");
+				}
 
 			}
 		}
@@ -1430,13 +1431,14 @@ emi_mpu_set_region_protection(gConEmiPhyBase,
 		addrPhy = addrPhy | 0x1000;
 
 		CONSYS_REG_WRITE(conn_reg.topckgen_base + CONSYS_EMI_MAPPING_OFFSET,
-				 CONSYS_REG_READ(conn_reg.topckgen_base + CONSYS_EMI_MAPPING_OFFSET) | addrPhy);
+				 (CONSYS_REG_READ(conn_reg.topckgen_base + CONSYS_EMI_MAPPING_OFFSET) & ~0x1fff) | addrPhy);
 
-		WMT_PLAT_INFO_FUNC("CONSYS_EMI_MAPPING dump(0x%08x)\n",
-				   CONSYS_REG_READ(conn_reg.topckgen_base + CONSYS_EMI_MAPPING_OFFSET));
+		WMT_PLAT_ERR_FUNC("CONSYS_EMI_MAPPING dump(0x%08x) gConEmiPhyBase=0x%zx\n",
+				   CONSYS_REG_READ(conn_reg.topckgen_base + CONSYS_EMI_MAPPING_OFFSET),
+				   (SIZE_T)gConEmiPhyBase);
 
 #if 1
-		pEmibaseaddr = ioremap_nocache(gConEmiPhyBase + SZ_1M / 2, CONSYS_EMI_MEM_SIZE);
+		pEmibaseaddr = ioremap_wc(gConEmiPhyBase + SZ_1M / 2, CONSYS_EMI_MEM_SIZE);
 #else
 		pEmibaseaddr = ioremap_nocache(CONSYS_EMI_AP_PHY_BASE, CONSYS_EMI_MEM_SIZE);
 #endif

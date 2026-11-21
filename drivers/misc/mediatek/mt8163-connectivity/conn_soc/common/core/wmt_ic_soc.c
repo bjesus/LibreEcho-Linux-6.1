@@ -996,16 +996,19 @@ static INT32 mtk_wcn_soc_sw_init(P_WMT_HIF_CONF pWmtHifConf)
 #endif
 	/* 6.3 Multi-patch Patch download */
 	for (patch_index = 0; patch_index < patch_num; patch_index++) {
+		WMT_ERR_FUNC("ECHO_PATCH: starting patch_index=%d/%d\n", patch_index, patch_num);
 		iRet = mtk_wcn_soc_patch_dwn(patch_index);
 		if (iRet) {
 			WMT_ERR_FUNC("patch dwn fail (%d),patch_index(%d)\n", iRet, patch_index);
 			return -7;
 		}
+		WMT_ERR_FUNC("ECHO_PATCH: patch_index=%d downloaded, running init_table_3\n", patch_index);
 		iRet = wmt_core_init_script(init_table_3, osal_array_size(init_table_3));
 		if (iRet) {
 			WMT_ERR_FUNC("init_table_3 fail(%d)\n", iRet);
 			return -8;
 		}
+		WMT_ERR_FUNC("ECHO_PATCH: patch_index=%d init_table_3 OK\n", patch_index);
 	}
 
 #if CFG_WMT_PATCH_DL_OPTM

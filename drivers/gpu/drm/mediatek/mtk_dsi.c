@@ -10,6 +10,7 @@
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/phy/phy.h>
+#include <linux/pm_runtime.h>
 #include <linux/platform_device.h>
 #include <linux/reset.h>
 
@@ -581,10 +582,11 @@ static irqreturn_t mtk_dsi_irq(int irq, void *dev_id)
 	status = readl(dsi->regs + DSI_INTSTA) & flag;
 
 	if (status) {
+		int retry = 1000;
 		do {
 			mtk_dsi_mask(dsi, DSI_RACK, RACK, RACK);
 			tmp = readl(dsi->regs + DSI_INTSTA);
-		} while (tmp & DSI_BUSY);
+		} while ((tmp & DSI_BUSY) && --retry);
 
 		mtk_dsi_mask(dsi, DSI_INTSTA, status, 0);
 		mtk_dsi_irq_data_set(dsi, status);
@@ -633,39 +635,54 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
 	dsi->data_rate = DIV_ROUND_UP_ULL(dsi->vm.pixelclock * bit_per_pixel,
 					  dsi->lanes);
 
-	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate);
-	if (ret < 0) {
-		dev_err(dev, "Failed to set data rate: %d\n", ret);
+	/* Keep LK's active 60Hz MIPI_TX0 + DSI0 video mode running on Douglas */
+	ret = clk_prepare_enable(dsi->engine_clk);
+	if (ret < 0)
 		goto err_refcount;
-	}
+	ret = clk_prepare_enable(dsi->digital_clk);
+	if (ret < 0)
+		goto err_disable_engine_clk;
+	return 0;
 
-	phy_power_on(dsi->phy);
+	pr_info("MTKDRM_TRACE: dsi_poweron rate=%u (keeping LK MIPI_TX0 PLL)\n", dsi->data_rate);
+	msleep(50);
 
+	pr_info("MTKDRM_TRACE: dsi_poweron engine_clk\n");
+	msleep(50);
 	ret = clk_prepare_enable(dsi->engine_clk);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable engine clock: %d\n", ret);
 		goto err_phy_power_off;
 	}
 
+	pr_info("MTKDRM_TRACE: dsi_poweron digital_clk\n");
+	msleep(50);
 	ret = clk_prepare_enable(dsi->digital_clk);
 	if (ret < 0) {
 		dev_err(dev, "Failed to enable digital clock: %d\n", ret);
 		goto err_disable_engine_clk;
 	}
 
+	pr_info("MTKDRM_TRACE: dsi_poweron mtk_dsi_enable regs=%px\n", dsi->regs);
+	msleep(50);
 	mtk_dsi_enable(dsi);
 
 	if (dsi->driver_data->has_shadow_ctl)
 		writel(FORCE_COMMIT | BYPASS_SHADOW,
 		       dsi->regs + DSI_SHADOW_DEBUG);
 
+	pr_info("MTKDRM_TRACE: dsi_poweron reset_engine\n");
+	msleep(50);
 	mtk_dsi_reset_engine(dsi);
 	mtk_dsi_phy_timconfig(dsi);
 
 	mtk_dsi_ps_control_vact(dsi);
 	mtk_dsi_set_vm_cmd(dsi);
 	mtk_dsi_config_vdo_timing(dsi);
+	pr_info("MTKDRM_TRACE: dsi_poweron set_irq_en\n");
+	msleep(50);
 	mtk_dsi_set_interrupt_enable(dsi);
+	pr_info("MTKDRM_TRACE: dsi_poweron DONE\n");
 
 	return 0;
 err_disable_engine_clk:
@@ -684,6 +701,10 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
 
 	if (--dsi->refcount != 0)
 		return;
+
+	clk_disable_unprepare(dsi->engine_clk);
+	clk_disable_unprepare(dsi->digital_clk);
+	return;
 
 	/*
 	 * mtk_dsi_stop() and mtk_dsi_start() is asymmetric, since
@@ -730,12 +751,6 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
 {
 	if (dsi->enabled)
 		return;
-
-	mtk_dsi_lane_ready(dsi);
-	mtk_dsi_set_mode(dsi);
-	mtk_dsi_clk_hs_mode(dsi, 1);
-
-	mtk_dsi_start(dsi);
 
 	dsi->enabled = true;
 }
@@ -1014,6 +1029,13 @@ static ssize_t mtk_dsi_host_send_cmd(struct mtk_dsi *dsi,
 static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
 				     const struct mipi_dsi_msg *msg)
 {
+	/* Panel is already initialized and scanning out in 60Hz video mode from LK */
+	return 0;
+}
+
+static ssize_t __unused_mtk_dsi_host_transfer(struct mipi_dsi_host *host,
+				     const struct mipi_dsi_msg *msg)
+{
 	struct mtk_dsi *dsi = host_to_dsi(host);
 	ssize_t recv_cnt;
 	u8 read_data[16];
@@ -1023,12 +1045,12 @@ static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
 	int ret, i;
 
 	dsi_mode = readl(dsi->regs + DSI_MODE_CTRL);
-	if (dsi_mode & MODE) {
-		mtk_dsi_stop(dsi);
-		ret = mtk_dsi_switch_to_cmd_mode(dsi, VM_DONE_INT_FLAG, 500);
-		if (ret)
-			goto restore_dsi_mode;
-	}
+	/*
+	 * douglas: do not stop/switch the DSI. VM_DONE never arrives here
+	 * (video engine not started yet at panel-init time), so the switch
+	 * always times out. The controller supports command insertion during
+	 * video mode via VM_CMD (enabled in mtk_dsi_poweron); send directly.
+	 */
 
 	if (MTK_DSI_HOST_IS_READ(msg->type))
 		irq_flag |= LPRX_RD_RDY_INT_FLAG;
@@ -1101,11 +1123,7 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 
 	dsi->host.ops = &mtk_dsi_ops;
 	dsi->host.dev = dev;
-	ret = mipi_dsi_host_register(&dsi->host);
-	if (ret < 0) {
-		dev_err(dev, "failed to register DSI host: %d\n", ret);
-		return ret;
-	}
+	platform_set_drvdata(pdev, dsi);
 
 	dsi->driver_data = of_device_get_match_data(dev);
 
@@ -1164,16 +1182,22 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 
 	init_waitqueue_head(&dsi->irq_wait_queue);
 
-	platform_set_drvdata(pdev, dsi);
-
 	dsi->bridge.funcs = &mtk_dsi_bridge_funcs;
 	dsi->bridge.of_node = dev->of_node;
 	dsi->bridge.type = DRM_MODE_CONNECTOR_DSI;
 
+	pm_runtime_enable(dev);
+	pm_runtime_get_sync(dev);
+
+	ret = mipi_dsi_host_register(&dsi->host);
+	if (ret < 0) {
+		dev_err(dev, "failed to register DSI host: %d\n", ret);
+		return ret;
+	}
+
 	return 0;
 
 err_unregister_host:
-	mipi_dsi_host_unregister(&dsi->host);
 	return ret;
 }
 

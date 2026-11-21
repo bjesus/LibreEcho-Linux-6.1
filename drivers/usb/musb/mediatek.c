@@ -1264,6 +1264,7 @@ static int mtk_musb_remove(struct platform_device *pdev)
 static const struct of_device_id mtk_musb_match[] = {
 	{ .compatible = "mediatek,mt8163-usb20", .data = &mt8163_musb_data },
 	{ .compatible = "mediatek,mtk-musb", .data = &mtk_musb_data },
+	{ .compatible = "mediatek,mt8163-usb20", .data = &mt8163_musb_data },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mtk_musb_match);

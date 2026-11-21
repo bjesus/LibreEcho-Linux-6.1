@@ -35,6 +35,13 @@ config SND_SOC_MT8163_RADAR_PUFFIN
 	  DAC, aggregate TLV320ADC3101 microphone component and FPGA SPI
 	  capture path.
 
+config SND_SOC_MT8163_DOUGLAS
+	tristate "ASoC machine driver for Amazon Fire HD 8 (douglas)"
+	depends on SND_SOC_MT8163
+	help
+	  Enable the MT8163 + MT6323 PMIC sound card for Amazon Fire HD 8
+	  (douglas).
+
 config SND_SOC_MT2701
 	tristate "ASoC support for Mediatek MT2701 chip"
 	depends on ARCH_MEDIATEK

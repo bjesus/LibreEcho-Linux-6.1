@@ -57,7 +57,7 @@ config MTK_SCPSYS
 
 config MTK_SCPSYS_MT8163
 	bool "MediaTek MT8163 SCPSYS Support"
-	depends on MACH_MT8163 || COMPILE_TEST
+	depends on ARCH_MEDIATEK || COMPILE_TEST
 	depends on OF
 	select MTK_INFRACFG
 	default MACH_MT8163

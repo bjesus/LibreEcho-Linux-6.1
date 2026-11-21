@@ -956,7 +956,8 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
 			      (mode << 12) | div);
 
 	clk_prepare_enable(host->src_clk_cg);
-	readl_poll_timeout(host->base + MSDC_CFG, val, (val & MSDC_CFG_CKSTB), 0, 0);
+	if (readl_poll_timeout(host->base + MSDC_CFG, val, (val & MSDC_CFG_CKSTB), 10, 100000))
+		dev_warn(host->dev, "MSDC_CFG_CKSTB timeout (cfg=0x%x)\n", val);
 	sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
 	mmc->actual_clock = sclk;
 	host->mclk = hz;
@@ -1514,10 +1515,13 @@ static int msdc_ops_switch_volt(struct mmc_host *mmc, struct mmc_ios *ios)
 		}
 
 		/* Apply different pinctrl settings for different signal voltage */
-		if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180)
-			pinctrl_select_state(host->pinctrl, host->pins_uhs);
-		else
-			pinctrl_select_state(host->pinctrl, host->pins_default);
+		if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+			if (host->pinctrl && host->pins_uhs)
+				pinctrl_select_state(host->pinctrl, host->pins_uhs);
+		} else {
+			if (host->pinctrl && host->pins_default)
+				pinctrl_select_state(host->pinctrl, host->pins_default);
+		}
 	}
 	return 0;
 }
@@ -1598,7 +1602,8 @@ static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
 				dev_dbg(host->dev, "SDIO eint irq: %d!\n", host->eint_irq);
 			}
 
-			pinctrl_select_state(host->pinctrl, host->pins_uhs);
+			if (host->pinctrl && host->pins_uhs)
+		pinctrl_select_state(host->pinctrl, host->pins_uhs);
 		} else {
 			dev_pm_clear_wake_irq(host->dev);
 		}
@@ -2703,23 +2708,24 @@ static int msdc_drv_probe(struct platform_device *pdev)
 
 	host->pinctrl = devm_pinctrl_get(&pdev->dev);
 	if (IS_ERR(host->pinctrl)) {
-		ret = PTR_ERR(host->pinctrl);
-		dev_err(&pdev->dev, "Cannot find pinctrl!\n");
-		goto host_free;
-	}
+		dev_warn(&pdev->dev, "No pinctrl, using bootloader pin mux\n");
+		host->pinctrl = NULL;
+		host->pins_default = NULL;
+		host->pins_uhs = NULL;
+	} else {
+		host->pins_default = pinctrl_lookup_state(host->pinctrl, "default");
+		if (IS_ERR(host->pins_default)) {
+			ret = PTR_ERR(host->pins_default);
+			dev_err(&pdev->dev, "Cannot find pinctrl default!\n");
+			goto host_free;
+		}
 
-	host->pins_default = pinctrl_lookup_state(host->pinctrl, "default");
-	if (IS_ERR(host->pins_default)) {
-		ret = PTR_ERR(host->pins_default);
-		dev_err(&pdev->dev, "Cannot find pinctrl default!\n");
-		goto host_free;
-	}
-
-	host->pins_uhs = pinctrl_lookup_state(host->pinctrl, "state_uhs");
-	if (IS_ERR(host->pins_uhs)) {
-		ret = PTR_ERR(host->pins_uhs);
-		dev_err(&pdev->dev, "Cannot find pinctrl uhs!\n");
-		goto host_free;
+		host->pins_uhs = pinctrl_lookup_state(host->pinctrl, "state_uhs");
+		if (IS_ERR(host->pins_uhs)) {
+			ret = PTR_ERR(host->pins_uhs);
+			dev_err(&pdev->dev, "Cannot find pinctrl uhs!\n");
+			goto host_free;
+		}
 	}
 
 	/* Support for SDIO eint irq ? */
@@ -2995,6 +3001,7 @@ static int __maybe_unused msdc_runtime_resume(struct device *dev)
 	msdc_restore_reg(host);
 
 	if (sdio_irq_claimed(mmc) && host->pins_eint) {
+		if (host->pinctrl && host->pins_uhs)
 		pinctrl_select_state(host->pinctrl, host->pins_uhs);
 		enable_irq(host->irq);
 	}

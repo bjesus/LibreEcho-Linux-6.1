@@ -65,6 +65,9 @@
 #include <linux/page_ext.h>
 #include <linux/debug_locks.h>
 #include <linux/debugobjects.h>
+
+/* douglas: uncached DRAM stage markers (arch/arm64/kernel/setup.c) */
+extern void kmark(u8 c);
 #include <linux/lockdep.h>
 #include <linux/kmemleak.h>
 #include <linux/padata.h>
@@ -700,6 +703,8 @@ noinline void __ref rest_init(void)
 {
 	struct task_struct *tsk;
 	int pid;
+
+	kmark('G');			/* rest_init: userspace boot beginning */
 
 	rcu_scheduler_starting();
 	/*
@@ -1415,6 +1420,7 @@ static void __init do_basic_setup(void)
 	init_irq_proc();
 	do_ctors();
 	do_initcalls();
+	kmark('H');			/* all initcalls done, drivers probed */
 }
 
 static void __init do_pre_smp_initcalls(void)
@@ -1532,6 +1538,7 @@ static int __ref kernel_init(void *unused)
 	kgdb_free_init_mem();
 	exit_boot_config();
 	free_initmem();
+	kmark('I');			/* initmem freed, about to exec /init */
 	mark_readonly();
 
 	/*

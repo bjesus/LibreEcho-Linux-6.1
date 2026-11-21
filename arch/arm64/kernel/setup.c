@@ -178,16 +178,33 @@ asmlinkage void __init early_fdt_map(u64 dt_phys)
 	early_fdt_ptr = fixmap_remap_fdt(dt_phys, &fdt_size, PAGE_KERNEL);
 }
 
+extern char dtb_builtin_begin[];
+extern char dtb_builtin_end[];
+extern void kmark(u8 c);
+extern void kmark_u64(int slot, u64 val);
+
 static void __init setup_machine_fdt(phys_addr_t dt_phys)
 {
-	int size;
-	void *dt_virt = fixmap_remap_fdt(dt_phys, &size, PAGE_KERNEL);
+	int size = 0;
+	void *dt_virt;
 	const char *name;
+
+	kmark('1');
+	kmark_u64(0, dt_phys);
+	kmark_u64(1, kimage_voffset);
+	/* Use the built-in DTB directly from .rodata (permanently mapped). */
+	dt_virt = (void *)dtb_builtin_begin;
+	size = (int)(dtb_builtin_end - dtb_builtin_begin);
+	kmark('2');
+	kmark_u64(4, (u64)dt_virt);
+	kmark_u64(5, (u64)size);
 
 	if (dt_virt)
 		memblock_reserve(dt_phys, size);
+	kmark('3');
 
 	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
+		kmark('X');
 		pr_crit("\n"
 			"Error: invalid device tree blob at physical address %pa (virtual address 0x%px)\n"
 			"The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
@@ -202,9 +219,7 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 		while (true)
 			cpu_relax();
 	}
-
-	/* Early fixups are done, map the FDT as read-only now */
-	fixmap_remap_fdt(dt_phys, &size, PAGE_KERNEL_RO);
+	kmark('4');
 
 	name = of_flat_dt_get_machine_name();
 	if (!name)
@@ -287,6 +302,77 @@ u64 cpu_logical_map(unsigned int cpu)
 	return __cpu_logical_map[cpu];
 }
 
+extern char dtb_builtin_begin[];
+
+/*
+ * Uncached DRAM stage markers at 0x98500000 (the 2MB hole, outside all
+ * memory blocks - survives every warm reset; readable from TWRP via
+ * /dev/physmem). We pin one fixmap slot (the otherwise-unused earlycon
+ * slot) to the page for the whole life of the kernel: one PTE write,
+ * valid from early_fixmap_init() until forever, no lifecycle headaches
+ * with early_ioremap slots. Device-nGnRE attributes mean writes reach
+ * DRAM even if the CPU hangs and the LK-armed watchdog hard-resets us.
+ */
+#define KMARK_PHYS_BASE		0x98500000UL
+#define KMARK_MAGIC		0x4B4D524B	/* "KMRK" */
+
+static u8 *kmark_va;
+static u8 kmark_idx = 0x10;
+static u32 kmark_log_pos;
+
+#define KMARK_LOG_OFF		0x300
+#define KMARK_LOG_SIZE		(0x1000 - KMARK_LOG_OFF)
+
+static void __init kmark_init(void)
+{
+	u32 *p;
+
+	__set_fixmap(FIX_EARLYCON_MEM_BASE, KMARK_PHYS_BASE, pgprot_device(PAGE_KERNEL));
+	kmark_va = (u8 *)__fix_to_virt(FIX_EARLYCON_MEM_BASE);
+
+	p = (u32 *)kmark_va;
+	if (p[0] == KMARK_MAGIC)
+		p[1]++;			/* boots since first flash */
+	else {
+		p[0] = KMARK_MAGIC;
+		p[1] = 1;
+	}
+	p[2] = 0;			/* reserved */
+	dsb(sy);
+}
+
+void kmark(u8 c)			/* called from init/main.c too - must not be __init */
+{
+	if (!kmark_va)
+		return;
+	writeb(c, kmark_va + kmark_idx++);
+	dsb(sy);
+}
+
+void kmark_u64(int slot, u64 val)
+{
+	if (!kmark_va || slot < 0 || slot >= 16)
+		return;
+	writeq(val, kmark_va + 0x40 + slot * 8);
+	dsb(sy);
+}
+
+void kmark_log(const char *s, size_t len)
+{
+	size_t i;
+
+	if (!kmark_va)
+		return;
+	for (i = 0; i < len; i++) {
+		writeb((u8)s[i], kmark_va + KMARK_LOG_OFF + (kmark_log_pos % KMARK_LOG_SIZE));
+		kmark_log_pos++;
+	}
+	writeb('\n', kmark_va + KMARK_LOG_OFF + (kmark_log_pos % KMARK_LOG_SIZE));
+	kmark_log_pos++;
+	writel(kmark_log_pos, kmark_va + 0x2f8);
+	dsb(sy);
+}
+
 void __init __no_sanitize_address setup_arch(char **cmdline_p)
 {
 	setup_initial_init_mm(_stext, _etext, _edata, _end);
@@ -301,9 +387,31 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	arm64_use_ng_mappings = kaslr_requires_kpti();
 
 	early_fixmap_init();
+
+	kmark_init();
+	kmark('A');			/* fixmap up */
+
 	early_ioremap_init();
 
+	/*
+	 * The LK always passes its own 3.18-era vendor DTB, which no mainline
+	 * driver can bind. Unconditionally use our built-in douglas DTB
+	 * instead (linked into .rodata - see arch/arm64/kernel/dtb_builtin.S).
+	 */
+	__fdt_pointer = __pa_symbol(dtb_builtin_begin);
+	kmark_u64(2, (u64)dtb_builtin_begin);
+	kmark_u64(3, (u64)(*(u32 *)dtb_builtin_begin));
+
 	setup_machine_fdt(__fdt_pointer);
+	kmark('B');			/* DTB scanned, memory/chosen known */
+
+	/*
+	 * NOTE: do NOT touch the MTK RGU watchdog here. Early experiments
+	 * (stage-marker stub stub3) showed that writes to 0x10007000 from
+	 * non-secure EL1 abort in this context, killing the kernel silently.
+	 * The LK arms the WDT with a ~60s timeout; if we hang, it resets us
+	 * and the DRAM trace/log at 0x98400000 survives for post-mortem.
+	 */
 
 	/*
 	 * Initialise the static keys early as they may be enabled by the
@@ -311,6 +419,7 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	 */
 	jump_label_init();
 	parse_early_param();
+	kmark('C');			/* early params parsed */
 
 	/*
 	 * Unmask asynchronous aborts and fiq after bringing up possible
@@ -332,8 +441,10 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	     pr_warn(FW_BUG "Kernel image misaligned at boot, please fix your bootloader!");
 
 	arm64_memblock_init();
+	kmark('D');			/* memblock ready */
 
 	paging_init();
+	kmark('E');			/* MMU/paging up */
 
 	acpi_table_upgrade();
 

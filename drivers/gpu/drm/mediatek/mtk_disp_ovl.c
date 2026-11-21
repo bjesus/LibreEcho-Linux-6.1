@@ -265,6 +265,8 @@ void mtk_ovl_layer_off(struct device *dev, unsigned int idx,
 			   DISP_REG_OVL_SRC_CON, BIT(idx));
 	mtk_ddp_write(cmdq_pkt, 0, &ovl->cmdq_reg, ovl->regs,
 		      DISP_REG_OVL_RDMA_CTRL(idx));
+	mtk_ddp_write(cmdq_pkt, 0x1, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_RST);
+	mtk_ddp_write(cmdq_pkt, 0x0, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_RST);
 }
 
 static unsigned int ovl_fmt_convert(struct mtk_disp_ovl *ovl, unsigned int fmt)
@@ -347,6 +349,8 @@ void mtk_ovl_layer_config(struct device *dev, unsigned int idx,
 			      DISP_REG_OVL_ADDR(ovl, idx));
 
 	mtk_ovl_layer_on(dev, idx, cmdq_pkt);
+	mtk_ddp_write(cmdq_pkt, 0x1, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_RST);
+	mtk_ddp_write(cmdq_pkt, 0x0, &ovl->cmdq_reg, ovl->regs, DISP_REG_OVL_RST);
 }
 
 void mtk_ovl_bgclr_in_on(struct device *dev)
@@ -421,6 +425,10 @@ static int mtk_disp_ovl_probe(struct platform_device *pdev)
 
 	priv->data = of_device_get_match_data(dev);
 	platform_set_drvdata(pdev, priv);
+
+	/* Disable and clear pending interrupts */
+	writel(0x0, priv->regs + DISP_REG_OVL_INTEN);
+	writel(0x0, priv->regs + DISP_REG_OVL_INTSTA);
 
 	ret = devm_request_irq(dev, irq, mtk_disp_ovl_irq_handler,
 			       IRQF_TRIGGER_NONE, dev_name(dev), priv);

@@ -408,7 +408,7 @@ config COMMON_CLK_MT8135
 
 config COMMON_CLK_MT8163
 	bool "Clock driver for MediaTek MT8163"
-	depends on (ARCH_MEDIATEK && ARM) || COMPILE_TEST
+	depends on (ARCH_MEDIATEK && (ARM || ARM64)) || COMPILE_TEST
 	select COMMON_CLK_MEDIATEK
 	default MACH_MT8163
 	help

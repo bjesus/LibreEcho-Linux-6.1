@@ -104,6 +104,7 @@ enum {
 };
 
 enum {
+	SILERGY_SYM827 = 1,
 	SILERGY_SYR82X = 8,
 	SILERGY_SYR83X = 9,
 };
@@ -217,6 +218,17 @@ static const unsigned int slew_rates[] = {
 	  500,
 };
 
+static const unsigned int sym827_slew_rates[] = {
+	83333,
+	41667,
+	20833,
+	10417,
+	 5208,
+	 2604,
+	 1302,
+	  651,
+};
+
 static const unsigned int tcs_slew_rates[] = {
 	18700,
 	 9300,
@@ -321,8 +333,17 @@ static int fan53555_voltages_setup_fairchild(struct fan53555_device_info *di)
 
 static int fan53555_voltages_setup_silergy(struct fan53555_device_info *di)
 {
+	di->ramp_delay_table = slew_rates;
+	di->n_ramp_values = ARRAY_SIZE(slew_rates);
+
 	/* Init voltage range and step */
 	switch (di->chip_id) {
+	case SILERGY_SYM827:
+		di->vsel_min = 600000;
+		di->vsel_step = 12500;
+		di->ramp_delay_table = sym827_slew_rates;
+		di->n_ramp_values = ARRAY_SIZE(sym827_slew_rates);
+		break;
 	case SILERGY_SYR82X:
 	case SILERGY_SYR83X:
 		di->vsel_min = 712500;
@@ -335,8 +356,6 @@ static int fan53555_voltages_setup_silergy(struct fan53555_device_info *di)
 	}
 	di->slew_reg = FAN53555_CONTROL;
 	di->slew_mask = CTL_SLEW_MASK;
-	di->ramp_delay_table = slew_rates;
-	di->n_ramp_values = ARRAY_SIZE(slew_rates);
 	di->vsel_count = FAN53555_NVOLTAGES;
 
 	return 0;
@@ -533,6 +552,9 @@ static const struct of_device_id __maybe_unused fan53555_dt_ids[] = {
 	}, {
 		.compatible = "fcs,fan53555",
 		.data = (void *)FAN53555_VENDOR_FAIRCHILD
+	}, {
+		.compatible = "silergy,sym827",
+		.data = (void *)FAN53555_VENDOR_SILERGY,
 	}, {
 		.compatible = "silergy,syr827",
 		.data = (void *)FAN53555_VENDOR_SILERGY,

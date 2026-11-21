@@ -68,6 +68,20 @@ static const struct mtk_mmsys_match_data mt6797_mmsys_match_data = {
 	},
 };
 
+static const struct mtk_mmsys_driver_data mt8163_mmsys_driver_data = {
+	/* clk-mt8163.c registers the mmsys clocks via CLK_OF_DECLARE */
+	.clk_driver = NULL,
+	.routes = mt8167_mmsys_routing_table,
+	.num_routes = ARRAY_SIZE(mt8167_mmsys_routing_table),
+};
+
+static const struct mtk_mmsys_match_data mt8163_mmsys_match_data = {
+	.num_drv_data = 1,
+	.drv_data = {
+		&mt8163_mmsys_driver_data,
+	},
+};
+
 static const struct mtk_mmsys_driver_data mt8167_mmsys_driver_data = {
 	.clk_driver = "clk-mt8167-mm",
 	.routes = mt8167_mmsys_routing_table,
@@ -302,7 +316,7 @@ static const struct reset_control_ops mtk_mmsys_reset_ops = {
 static int mtk_mmsys_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
-	struct platform_device *clks;
+	struct platform_device *clks = NULL;
 	struct platform_device *drm;
 	const struct mtk_mmsys_match_data *match_data;
 	struct mtk_mmsys *mmsys;
@@ -355,10 +369,13 @@ static int mtk_mmsys_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mmsys);
 
-	clks = platform_device_register_data(&pdev->dev, mmsys->data->clk_driver,
-					     PLATFORM_DEVID_AUTO, NULL, 0);
-	if (IS_ERR(clks))
-		return PTR_ERR(clks);
+	if (mmsys->data->clk_driver) {
+		clks = platform_device_register_data(&pdev->dev,
+						     mmsys->data->clk_driver,
+						     PLATFORM_DEVID_AUTO, NULL, 0);
+		if (IS_ERR(clks))
+			return PTR_ERR(clks);
+	}
 
 	drm = platform_device_register_data(&pdev->dev, "mediatek-drm",
 					    PLATFORM_DEVID_AUTO, NULL, 0);
@@ -386,6 +403,10 @@ static const struct of_device_id of_match_mtk_mmsys[] = {
 	{
 		.compatible = "mediatek,mt6797-mmsys",
 		.data = &mt6797_mmsys_match_data,
+	},
+	{
+		.compatible = "mediatek,mt8163-mmsys",
+		.data = &mt8163_mmsys_match_data,
 	},
 	{
 		.compatible = "mediatek,mt8167-mmsys",

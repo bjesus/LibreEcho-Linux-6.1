@@ -2141,6 +2141,10 @@ static u16 printk_sprint(char *text, u16 size, int facility,
 	}
 
 	trace_console_rcuidle(text, text_len);
+	{
+		extern void kmark_log(const char *s, size_t len);
+		kmark_log(text, text_len);
+	}
 
 	return text_len;
 }

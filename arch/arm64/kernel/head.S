@@ -86,6 +86,12 @@
 	 *  x28        create_idmap()                           callee preserved temp register
 	 */
 SYM_CODE_START(primary_entry)
+	/* douglas: raw physical marker '0' at 0x9850000c before MMU is on */
+	movz	x9, #0x000c
+	movk	x9, #0x9850, lsl #16
+	mov	w10, #0x30
+	strb	w10, [x9]
+	dsb	sy
 	bl	preserve_boot_args
 	bl	init_kernel_el			// w0=cpu_boot_mode
 	mov	x20, x0
@@ -106,6 +112,12 @@ SYM_CODE_START(primary_entry)
 	mov	x0, x25
 #endif
 	bl	__cpu_setup			// initialise processor
+	/* douglas: raw physical marker '1' at 0x9850000d before __primary_switch */
+	movz	x9, #0x000d
+	movk	x9, #0x9850, lsl #16
+	mov	w10, #0x31
+	strb	w10, [x9]
+	dsb	sy
 	b	__primary_switch
 SYM_CODE_END(primary_entry)
 

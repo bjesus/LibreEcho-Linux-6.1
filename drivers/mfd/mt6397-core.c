@@ -323,19 +323,26 @@ static int mt6397_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, pmic);
 
-	pmic->irq = platform_get_irq(pdev, 0);
-	if (pmic->irq <= 0)
-		return pmic->irq;
-
-	ret = pmic_core->irq_init(pmic);
-	if (ret)
-		return ret;
+	pmic->irq = platform_get_irq_optional(pdev, 0);
+	if (pmic->irq > 0) {
+		ret = pmic_core->irq_init(pmic);
+		if (ret) {
+			dev_warn(&pdev->dev,
+				 "PMIC IRQ init failed (%d), continuing without PMIC IRQ domain\n",
+				 ret);
+			pmic->irq_domain = NULL;
+		}
+	} else {
+		dev_warn(&pdev->dev, "No PMIC IRQ configured, continuing without PMIC IRQ domain\n");
+		pmic->irq_domain = NULL;
+	}
 
 	ret = devm_mfd_add_devices(&pdev->dev, PLATFORM_DEVID_NONE,
 				   pmic_core->cells, pmic_core->cell_size,
 				   NULL, 0, pmic->irq_domain);
 	if (ret) {
-		irq_domain_remove(pmic->irq_domain);
+		if (pmic->irq_domain)
+			irq_domain_remove(pmic->irq_domain);
 		dev_err(&pdev->dev, "failed to add child devices: %d\n", ret);
 	}
 
