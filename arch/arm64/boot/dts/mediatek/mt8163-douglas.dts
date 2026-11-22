@@ -423,6 +423,11 @@
 				 */
 				keys {
 					compatible = "mediatek,mt6323-keys";
+					/* PMIC hardware reset on an ~8 s Power hold, independent of
+					 * the kernel and userspace: the only way out when the
+					 * session cannot reach elogind (2026-11-22). */
+					mediatek,long-press-mode = <1>;
+					power-off-time-sec = <0>;
 
 					power {
 						linux,keycodes = <KEY_POWER>;
