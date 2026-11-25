@@ -981,6 +981,18 @@
 				status = "disabled";
 			};
 
+			accelerometer@18 {
+				compatible = "bosch,bma253";
+				reg = <0x18>;
+				/* mount matrix is applied in userspace (udev ACCEL_MOUNT_MATRIX) */
+			};
+
+			light-sensor@44 {
+				/* Solteam Opto JSA1212, matched through the i2c id table */
+				compatible = "solteam-opto,jsa1212";
+				reg = <0x44>;
+			};
+
 			charger: bq24296@6b {
 				compatible = "ti,bq24297";
 				reg = <0x6b>;

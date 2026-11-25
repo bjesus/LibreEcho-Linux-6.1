@@ -64,3 +64,4 @@ obj-$(CONFIG_GP_PCI1XXXX)	+= mchp_pci1xxxx/
 obj-$(CONFIG_VCPU_STALL_DETECTOR)	+= vcpu_stall_detector.o
 obj-$(CONFIG_AMZ_PRIVACY)		+= amz_privacy.o
 obj-$(CONFIG_MTK_MT8163_CONSYS)	+= mediatek/
+obj-y				+= douglas/

@@ -6,3 +6,4 @@ obj-$(CONFIG_SND_SOC_MT8163_RADAR_PUFFIN) += snd-soc-mt8163-radar-puffin.o
 obj-$(CONFIG_SND_SOC_MT8163_DOUGLAS) += mt8163-douglas.o
 
 snd-soc-mt8163-radar-puffin-objs := mt8163-radar-puffin.o
+obj-$(CONFIG_SND_SOC_MT8163_DOUGLAS_ALSA) += douglas-alsa.o

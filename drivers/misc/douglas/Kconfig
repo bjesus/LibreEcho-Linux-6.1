@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: GPL-2.0
+menu "Amazon Fire HD 8 (2017, douglas) board drivers"
+
+config DOUGLAS_KEYS
+	tristate "Volume Up key on the MT8163 keypad controller"
+	depends on INPUT && (ARCH_MEDIATEK || COMPILE_TEST)
+	help
+	  Polls the MT8163 KPD controller for the Volume Up key of the Amazon
+	  Fire HD 8 (2017). Power and Volume Down are PMIC keys and handled by
+	  mtk-pmic-keys.
+
+config DOUGLAS_BATTERY
+	tristate "Battery voltage gauge via the MT6323 AUXADC"
+	depends on MFD_MT6397 && POWER_SUPPLY
+	help
+	  Board-specific battery gauge for the Amazon Fire HD 8 (2017): reads
+	  the battery voltage through the MT6323 PMIC AUXADC and reports a
+	  power_supply device with an estimated capacity.
+
+endmenu
