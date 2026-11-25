@@ -13,6 +13,7 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/initrd.h>
+#include <linux/libfdt.h>
 #include <linux/console.h>
 #include <linux/cache.h>
 #include <linux/screen_info.h>
@@ -181,6 +182,47 @@ asmlinkage void __init early_fdt_map(u64 dt_phys)
 extern char dtb_builtin_begin[];
 extern char dtb_builtin_end[];
 extern void kmark(u8 c);
+
+extern void kmark_u64(int slot, u64 val);
+
+static u64 __init lk_chosen_u64(const void *fdt, int node, const char *name)
+{
+	int len;
+	const __be32 *p = fdt_getprop(fdt, node, name, &len);
+
+	if (!p)
+		return 0;
+	if (len == 8)
+		return ((u64)be32_to_cpu(p[0]) << 32) | be32_to_cpu(p[1]);
+	if (len == 4)
+		return be32_to_cpu(p[0]);
+	return 0;
+}
+
+/* Read linux,initrd-start/end from the FDT LK handed over (x0). */
+static void __init douglas_initrd_from_lk_fdt(phys_addr_t lk_phys)
+{
+	int size = 0, node;
+	const void *fdt;
+	u64 start, end;
+
+	if (!lk_phys || !IS_ENABLED(CONFIG_BLK_DEV_INITRD))
+		return;
+	fdt = fixmap_remap_fdt(lk_phys, &size, PAGE_KERNEL_RO);
+	if (!fdt)
+		return;
+	node = fdt_path_offset(fdt, "/chosen");
+	if (node < 0)
+		return;
+	start = lk_chosen_u64(fdt, node, "linux,initrd-start");
+	end = lk_chosen_u64(fdt, node, "linux,initrd-end");
+	if (start && end > start) {
+		phys_initrd_start = start;
+		phys_initrd_size = end - start;
+		kmark_u64(6, start);
+		kmark_u64(7, end);
+	}
+}
 extern void kmark_u64(int slot, u64 val);
 
 static void __init setup_machine_fdt(phys_addr_t dt_phys)
@@ -397,7 +439,11 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 	 * The LK always passes its own 3.18-era vendor DTB, which no mainline
 	 * driver can bind. Unconditionally use our built-in douglas DTB
 	 * instead (linked into .rodata - see arch/arm64/kernel/dtb_builtin.S).
+	 * Before dropping it, take the one thing only LK knows: where it put
+	 * the boot.img ramdisk (/chosen/linux,initrd-start|end), so an
+	 * external initramfs (postmarketOS) works with the built-in DTB.
 	 */
+	douglas_initrd_from_lk_fdt(__fdt_pointer);
 	__fdt_pointer = __pa_symbol(dtb_builtin_begin);
 	kmark_u64(2, (u64)dtb_builtin_begin);
 	kmark_u64(3, (u64)(*(u32 *)dtb_builtin_begin));
