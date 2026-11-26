@@ -2111,14 +2111,14 @@ WLAN_STATUS nicTxInitCmd(IN P_ADAPTER_T prAdapter, IN P_CMD_INFO_T prCmdInfo, IN
 
 	/* <4> Write frame to data port */
 	if (prInitTxHeader->rInitWifiCmd.ucCID == INIT_CMD_ID_WIFI_START)
-		pr_err("ECHO_FW_START_SUBMIT: before HIF TX port write bytes=%u port=%u cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_FW_START_SUBMIT: before HIF TX port write bytes=%u port=%u cpu=%u jiffies=%lu\n",
 		       u2OverallBufferLength, ucPortIdx, raw_smp_processor_id(), jiffies);
 	HAL_WRITE_TX_PORT(prAdapter,
 			  ucPortIdx,
 			  (UINT_32) u2OverallBufferLength,
 			  (PUINT_8) pucOutputBuf, (UINT_32) prAdapter->u4CoalescingBufCachedSize);
 	if (prInitTxHeader->rInitWifiCmd.ucCID == INIT_CMD_ID_WIFI_START)
-		pr_err("ECHO_FW_START_SUBMIT: after HIF TX port write cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_FW_START_SUBMIT: after HIF TX port write cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 
 	return WLAN_STATUS_SUCCESS;

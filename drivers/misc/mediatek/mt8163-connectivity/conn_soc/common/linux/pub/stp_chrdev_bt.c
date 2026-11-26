@@ -142,7 +142,7 @@ static int mtk_bt_hci_open(struct hci_dev *hdev)
 
 	result = mtk_wcn_wmt_func_on(WMTDRV_TYPE_BT);
 	if (result != MTK_WCN_BOOL_TRUE) {
-		pr_err("ECHO_BT_HCI_OPEN: FUNC_ON failed ret=%d\n", result);
+		pr_debug("ECHO_BT_HCI_OPEN: FUNC_ON failed ret=%d\n", result);
 		return -ENODEV;
 	}
 	pr_info("ECHO_BT_HCI_OPEN: FUNC_ON ok ready=%d\n",
@@ -287,13 +287,13 @@ static void mtk_bt_hci_reg_work(struct work_struct *work)
 			schedule_delayed_work(&mtk_hci_reg_work, msecs_to_jiffies(500));
 			return;
 		}
-		pr_err("ECHO_BT_HCI: STP never became ready, HCI not registered\n");
+		pr_debug("ECHO_BT_HCI: STP never became ready, HCI not registered\n");
 		return;
 	}
 	pr_info("ECHO_BT_HCI: STP ready after %d polls, registering hci\n", mtk_hci_reg_tries);
 	result = hci_register_dev(mtk_hci.hdev);
 	if (result) {
-		pr_err("ECHO_BT_HCI: hci_register_dev failed %d\n", result);
+		pr_debug("ECHO_BT_HCI: hci_register_dev failed %d\n", result);
 		hci_free_dev(mtk_hci.hdev);
 		mtk_hci.hdev = NULL;
 	}

@@ -937,44 +937,44 @@ VOID wmt_plat_dump_ap_state(const char *pszStage)
 	UINT32 pwr, ack, rst, axi_en, axi_sta;
 
 	if (!conn_reg.spm_base || !conn_reg.ap_rgu_base || !conn_reg.topckgen_base) {
-		pr_err("ECHO_AP: %s bases unavailable\n", pszStage);
+		pr_debug("ECHO_AP: %s bases unavailable\n", pszStage);
 		aee_rr_rec_fiq_step(0xF0);
 		return;
 	}
 
-	pr_err("ECHO_AP: %s begin\n", pszStage);
+	pr_debug("ECHO_AP: %s begin\n", pszStage);
 	aee_rr_rec_fiq_step(0xF1);
-	pr_err("ECHO_AP: before power status\n");
+	pr_debug("ECHO_AP: before power status\n");
 	pwr = CONSYS_REG_READ(conn_reg.spm_base + CONSYS_TOP1_PWR_CTRL_OFFSET);
 	aee_rr_rec_fiq_step(0xF2);
-	pr_err("ECHO_AP: power status=0x%08x\n", pwr);
+	pr_debug("ECHO_AP: power status=0x%08x\n", pwr);
 
 	aee_rr_rec_fiq_step(0xF3);
-	pr_err("ECHO_AP: before power ack\n");
+	pr_debug("ECHO_AP: before power ack\n");
 	ack = CONSYS_REG_READ(conn_reg.spm_base + CONSYS_PWR_CONN_ACK_OFFSET);
 	aee_rr_rec_fiq_step(0xF4);
-	pr_err("ECHO_AP: power ack=0x%08x\n", ack);
+	pr_debug("ECHO_AP: power ack=0x%08x\n", ack);
 
 	aee_rr_rec_fiq_step(0xF5);
-	pr_err("ECHO_AP: before AP reset status\n");
+	pr_debug("ECHO_AP: before AP reset status\n");
 	rst = CONSYS_REG_READ(conn_reg.ap_rgu_base + CONSYS_CPU_SW_RST_OFFSET);
 	aee_rr_rec_fiq_step(0xF6);
-	pr_err("ECHO_AP: AP reset status=0x%08x\n", rst);
+	pr_debug("ECHO_AP: AP reset status=0x%08x\n", rst);
 
 	aee_rr_rec_fiq_step(0xF7);
-	pr_err("ECHO_AP: before AXI protection enable\n");
+	pr_debug("ECHO_AP: before AXI protection enable\n");
 	axi_en = CONSYS_REG_READ(conn_reg.topckgen_base + CONSYS_TOPAXI_PROT_EN_OFFSET);
 	aee_rr_rec_fiq_step(0xF8);
-	pr_err("ECHO_AP: AXI protection enable=0x%08x\n", axi_en);
+	pr_debug("ECHO_AP: AXI protection enable=0x%08x\n", axi_en);
 
 	aee_rr_rec_fiq_step(0xF9);
-	pr_err("ECHO_AP: before AXI protection status\n");
+	pr_debug("ECHO_AP: before AXI protection status\n");
 	axi_sta = CONSYS_REG_READ(conn_reg.topckgen_base + CONSYS_TOPAXI_PROT_STA1_OFFSET);
 	aee_rr_rec_fiq_step(0xFA);
-	pr_err("ECHO_AP: AXI protection status=0x%08x\n", axi_sta);
+	pr_debug("ECHO_AP: AXI protection status=0x%08x\n", axi_sta);
 
 	aee_rr_rec_fiq_step(0xFB);
-	pr_err("ECHO_AP: %s complete pwr=0x%08x ack=0x%08x rst=0x%08x axi_en=0x%08x axi_sta=0x%08x\n",
+	pr_debug("ECHO_AP: %s complete pwr=0x%08x ack=0x%08x rst=0x%08x axi_en=0x%08x axi_sta=0x%08x\n",
 	       pszStage, pwr, ack, rst, axi_en, axi_sta);
 }
 EXPORT_SYMBOL(wmt_plat_dump_ap_state);

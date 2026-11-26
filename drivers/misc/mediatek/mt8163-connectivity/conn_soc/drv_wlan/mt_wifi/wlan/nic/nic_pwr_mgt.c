@@ -330,12 +330,12 @@ BOOLEAN nicpmSetDriverOwn(IN P_ADAPTER_T prAdapter)
 
 	while (1) {
 		if (i == 0 || i == 1)
-			pr_err("ECHO_WLAN_HIF: before WHLPCR read iter=%u base=%p cpu=%u jiffies=%lu irq=%u preempt=%x\n",
+			pr_debug("ECHO_WLAN_HIF: before WHLPCR read iter=%u base=%p cpu=%u jiffies=%lu irq=%u preempt=%x\n",
 			       i, HifInfo->HifRegBaseAddr, raw_smp_processor_id(), jiffies,
 			       irqs_disabled(), preempt_count());
 		HAL_MCR_RD(prAdapter, MCR_WHLPCR, &u4RegValue);
 		if (i == 0 || i == 1)
-			pr_err("ECHO_WLAN_HIF: after WHLPCR read iter=%u value=0x%08x cpu=%u jiffies=%lu\n",
+			pr_debug("ECHO_WLAN_HIF: after WHLPCR read iter=%u value=0x%08x cpu=%u jiffies=%lu\n",
 			       i, u4RegValue, raw_smp_processor_id(), jiffies);
 
 		if (u4RegValue & WHLPCR_FW_OWN_REQ_SET) {
@@ -350,7 +350,7 @@ BOOLEAN nicpmSetDriverOwn(IN P_ADAPTER_T prAdapter)
 			 * interconnect and prevent the hardware watchdog from being kicked.
 			 */
 			fgStatus = FALSE;
-			pr_err("ECHO_WLAN_HIF: driver-own timeout elapsed=%u loops=%u WHLPCR=0x%08x removed=%u busfail=%u resetting=%u\n",
+			pr_debug("ECHO_WLAN_HIF: driver-own timeout elapsed=%u loops=%u WHLPCR=0x%08x removed=%u busfail=%u resetting=%u\n",
 			       kalGetTimeTick() - u4CurrTick, i, u4RegValue,
 			       kalIsCardRemoved(prAdapter->prGlueInfo), fgIsBusAccessFailed,
 			       fgIsResetting);
@@ -359,12 +359,12 @@ BOOLEAN nicpmSetDriverOwn(IN P_ADAPTER_T prAdapter)
 		if ((i & (LP_OWN_BACK_CLR_OWN_ITERATION - 1)) == 0) {
 			/* Software get LP ownership - per 256 iterations. */
 			if (i == 0)
-				pr_err("ECHO_WLAN_HIF: before WHLPCR own-clear write value=0x%08lx base=%p cpu=%u jiffies=%lu\n",
+				pr_debug("ECHO_WLAN_HIF: before WHLPCR own-clear write value=0x%08lx base=%p cpu=%u jiffies=%lu\n",
 				       (unsigned long)WHLPCR_FW_OWN_REQ_CLR,
 				       HifInfo->HifRegBaseAddr, raw_smp_processor_id(), jiffies);
 			HAL_MCR_WR(prAdapter, MCR_WHLPCR, WHLPCR_FW_OWN_REQ_CLR);
 			if (i == 0)
-				pr_err("ECHO_WLAN_HIF: after WHLPCR own-clear write cpu=%u jiffies=%lu\n",
+				pr_debug("ECHO_WLAN_HIF: after WHLPCR own-clear write cpu=%u jiffies=%lu\n",
 				       raw_smp_processor_id(), jiffies);
 		}
 

@@ -79,9 +79,9 @@ INT32 mtk_wcn_consys_stp_btif_open(VOID)
 	INT32 iRet = -1;
 	INT32 tx_ret;
 
-	pr_err("ECHO_BTIF_OPEN: before id=%lx ref=%p\n", stpBtifId, pBtifRef);
+	pr_debug("ECHO_BTIF_OPEN: before id=%lx ref=%p\n", stpBtifId, pBtifRef);
 	iRet = mtk_wcn_btif_open(BTIF_OWNER_NAME, pBtifRef);
-	pr_err("ECHO_BTIF_OPEN: open ret=%d id=%lx ref=%p\n", iRet, stpBtifId, pBtifRef);
+	pr_debug("ECHO_BTIF_OPEN: open ret=%d id=%lx ref=%p\n", iRet, stpBtifId, pBtifRef);
 	if (iRet) {
 		WMT_WARN_FUNC("STP open btif fail(%d)\n", iRet);
 		return -1;
@@ -90,7 +90,7 @@ INT32 mtk_wcn_consys_stp_btif_open(VOID)
 
 	tx_ret = mtk_wcn_stp_register_if_tx(STP_BTIF_IF_TX,
 					    (MTK_WCN_STP_IF_TX) mtk_wcn_consys_stp_btif_tx);
-	pr_err("ECHO_BTIF_OPEN: TX callback registered slot=%d ret=%d\n",
+	pr_debug("ECHO_BTIF_OPEN: TX callback registered slot=%d ret=%d\n",
 	       STP_BTIF_IF_TX, tx_ret);
 	if (tx_ret)
 		return tx_ret;
@@ -164,7 +164,7 @@ INT32 mtk_wcn_consys_stp_btif_tx(const UINT8 *pBuf, const UINT32 len, UINT32 *wr
 	wr_count = mtk_wcn_btif_write(stpBtifId, pBuf, len);
 
 	if (wr_count < 0 || wr_count == 0)
-		pr_err("ECHO_BTIF_TX: write=%d len=%u\n", wr_count, len);
+		pr_debug("ECHO_BTIF_TX: write=%d len=%u\n", wr_count, len);
 
 	if (wr_count < 0) {
 		WMT_ERR_FUNC("mtk_wcn_btif_write err(%d)\n", wr_count);
@@ -182,7 +182,7 @@ INT32 mtk_wcn_consys_stp_btif_tx(const UINT8 *pBuf, const UINT32 len, UINT32 *wr
 		osal_sleep_ms(STP_BTIF_TX_RTY_DLY);
 		written = mtk_wcn_btif_write(stpBtifId, pBuf + wr_count, len - wr_count);
 		if (written <= 0)
-			pr_err("ECHO_BTIF_TX: retry offset=%d requested=%u ret=%d\n",
+			pr_debug("ECHO_BTIF_TX: retry offset=%d requested=%u ret=%d\n",
 			       wr_count, len - wr_count, written);
 		if (written < 0) {
 			WMT_ERR_FUNC("mtk_wcn_btif_write err(%d)when do recovered\n", written);

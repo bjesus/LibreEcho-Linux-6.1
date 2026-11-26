@@ -515,7 +515,7 @@ WLAN_STATUS glRegisterBus(probe_card pfProbe, remove_card pfRemove)
 	}
 
 	Ret = HifAhbProbe();
-	pr_err("ECHO_RET: HifAhbProbe=%d\n", Ret);
+	pr_debug("ECHO_RET: HifAhbProbe=%d\n", Ret);
 #else
 
 	Ret = platform_driver_register(&MtkPltmAhbDriver);
@@ -609,10 +609,10 @@ VOID glSetHifInfo(GLUE_INFO_T *GlueInfo, ULONG ulCookie)
 	HifInfo->DmaOps = NULL;
 
 	/* read chip ID */
-	pr_err("ECHO_WLAN_HIF: before WCIR read base=%p cpu=%u jiffies=%lu\n",
+	pr_debug("ECHO_WLAN_HIF: before WCIR read base=%p cpu=%u jiffies=%lu\n",
 	       HifInfo->HifRegBaseAddr, raw_smp_processor_id(), jiffies);
 	HifInfo->ChipID = HIF_REG_READL(HifInfo, MCR_WCIR) & 0xFFFF;
-	pr_err("ECHO_WLAN_HIF: after WCIR read value=0x%04x cpu=%u jiffies=%lu\n",
+	pr_debug("ECHO_WLAN_HIF: after WCIR read value=0x%04x cpu=%u jiffies=%lu\n",
 	       HifInfo->ChipID, raw_smp_processor_id(), jiffies);
 	if (HifInfo->ChipID == 0x0321 || HifInfo->ChipID == 0x0335 || HifInfo->ChipID == 0x0337)
 		HifInfo->ChipID = 0x6735;	/* Denali ChipID transition */
@@ -633,7 +633,7 @@ VOID glSetHifInfo(GLUE_INFO_T *GlueInfo, ULONG ulCookie)
 			DBGLOG(INIT, ERROR, "[WiFi/HIF][CCF]hold HIF clk_wifi_dma failed: %d\n", clk_ret);
 		} else {
 			HifInfo->fgWifiDmaClkHeld = TRUE;
-			pr_err("ECHO_WLAN_HIF: held wifi-dma clock rate=%lu\n",
+			pr_debug("ECHO_WLAN_HIF: held wifi-dma clock rate=%lu\n",
 			       clk_get_rate(HifInfo->clk_wifi_dma));
 		}
 	}
@@ -696,7 +696,7 @@ VOID glClearHifInfo(GLUE_INFO_T *GlueInfo)
 	if (GlueInfo->rHifInfo.fgWifiDmaClkHeld == TRUE) {
 		clk_disable_unprepare(GlueInfo->rHifInfo.clk_wifi_dma);
 		GlueInfo->rHifInfo.fgWifiDmaClkHeld = FALSE;
-		pr_err("ECHO_WLAN_HIF: released wifi-dma clock\n");
+		pr_debug("ECHO_WLAN_HIF: released wifi-dma clock\n");
 	}
 #endif
 	iounmap(GlueInfo->rHifInfo.HifRegBaseAddr);
@@ -1662,7 +1662,7 @@ static irqreturn_t HifAhbISR(IN int Irq, IN void *Arg)
 	/* Init */
 	IsrCnt++;
 	if (IsrCnt <= 5 || (IsrCnt % 1000) == 0)
-		pr_err("ECHO_WLAN_IRQ: enter count=%u irq=%d cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_IRQ: enter count=%u irq=%d cpu=%u jiffies=%lu\n",
 		       IsrCnt, Irq, raw_smp_processor_id(), jiffies);
 	ASSERT(prNetDevice);
 	GlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prNetDevice));
@@ -1682,7 +1682,7 @@ static irqreturn_t HifAhbISR(IN int Irq, IN void *Arg)
 
 	HIF_REG_WRITEL(HifInfo, MCR_WHLPCR, WHLPCR_INT_EN_CLR);
 	if (IsrCnt <= 5 || (IsrCnt % 1000) == 0)
-		pr_err("ECHO_WLAN_IRQ: after INT_EN_CLR count=%u cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_IRQ: after INT_EN_CLR count=%u cpu=%u jiffies=%lu\n",
 		       IsrCnt, raw_smp_processor_id(), jiffies);
 
 #if 0
@@ -1775,9 +1775,9 @@ static int HifAhbProbe(VOID)
 	int i4RailRet;
 	int i4PreviousStage = aee_rr_curr_fiq_step();
 
-	pr_err("ECHO_RET: previous persistent stage=0x%02x\n", i4PreviousStage);
+	pr_debug("ECHO_RET: previous persistent stage=0x%02x\n", i4PreviousStage);
 	aee_rr_rec_fiq_step(0xE1);
-	pr_err("ECHO_RET: HifAhbProbe enter cpu=%u jiffies=%lu\n",
+	pr_debug("ECHO_RET: HifAhbProbe enter cpu=%u jiffies=%lu\n",
 	       raw_smp_processor_id(), jiffies);
 
 	/* ASSERT(dev); */
@@ -1807,7 +1807,7 @@ static int HifAhbProbe(VOID)
 		/* hwPowerOn(MT6325_POWER_LDO_VCN33, VOL_3300, "WLAN"); */
 		i4RailRet = mtk_wcn_consys_hw_wifi_paldo_ctrl(1);
 		if (i4RailRet) {
-			pr_err("ECHO_WIFI_RAIL: WLAN probe blocked ret=%d\n", i4RailRet);
+			pr_debug("ECHO_WIFI_RAIL: WLAN probe blocked ret=%d\n", i4RailRet);
 			return i4RailRet;
 		}
 #else				/*for MT6572/82/92 */
@@ -1826,16 +1826,16 @@ static int HifAhbProbe(VOID)
 #else
 	i4ProbeRet = pfWlanProbe((PVOID) &HifAhbPDev->dev);
 #endif /* CONF_HIF_DEV_MISC */
-	pr_err("ECHO_RET: pfWlanProbe=%d cpu=%u jiffies=%lu\n",
+	pr_debug("ECHO_RET: pfWlanProbe=%d cpu=%u jiffies=%lu\n",
 	       i4ProbeRet, raw_smp_processor_id(), jiffies);
 	if (i4ProbeRet != WLAN_STATUS_SUCCESS) {
-		pr_err("ECHO_RET: pfWlanProbe failure, invoking remove cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_RET: pfWlanProbe failure, invoking remove cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		pfWlanRemove();
 		Ret = -1;
 	}
 
-	pr_err("ECHO_RET: HifAhbProbe return=%d cpu=%u jiffies=%lu\n",
+	pr_debug("ECHO_RET: HifAhbProbe return=%d cpu=%u jiffies=%lu\n",
 	       Ret, raw_smp_processor_id(), jiffies);
 	aee_rr_rec_fiq_step(0xE8);
 	return Ret;
@@ -2069,7 +2069,7 @@ static int HifAhbPltmProbe(IN struct platform_device *PDev)
 		WmtCb.wlan_bus_cnt_get_cb = HifAhbBusCntGet;
 		WmtCb.wlan_bus_cnt_clr_cb = HifAhbBusCntClr;
 		i4WmtRet = mtk_wcn_wmt_wlan_reg(&WmtCb);
-		pr_err("ECHO_RET: mtk_wcn_wmt_wlan_reg=%d\n", i4WmtRet);
+		pr_debug("ECHO_RET: mtk_wcn_wmt_wlan_reg=%d\n", i4WmtRet);
 		if (i4WmtRet) {
 			mtk_wcn_wmt_wlan_unreg();
 			if (i4WmtRet == -3)

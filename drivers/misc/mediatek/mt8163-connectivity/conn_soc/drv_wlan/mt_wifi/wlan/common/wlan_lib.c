@@ -993,7 +993,7 @@ static VOID echoWlanExecutionSnapshot(IN P_ADAPTER_T prAdapter, IN const char *p
 	HAL_MCR_RD(prAdapter, MCR_WASR, &wasr);
 	HAL_MCR_RD(prAdapter, MCR_D2HRM0R, &d2h0);
 	HAL_MCR_RD(prAdapter, MCR_D2HRM1R, &d2h1);
-	pr_err("ECHO_FW_EXEC: %s CPUPCR=0x%08x WCIR=0x%08x POR=%u READY=%u "
+	pr_debug("ECHO_FW_EXEC: %s CPUPCR=0x%08x WCIR=0x%08x POR=%u READY=%u "
 	       "WASR=0x%08x D2HRM0=0x%08x D2HRM1=0x%08x cpu=%u jiffies=%lu\n",
 	       pszStage, cpupcr, wc, !!(wc & WCIR_POR_INDICATOR),
 	       !!(wc & WCIR_WLAN_READY), wasr, d2h0, d2h1,
@@ -1037,7 +1037,7 @@ static VOID echoWlanCpuHistDump(VOID)
 {
 	UINT_32 i, j, u4Best;
 
-	pr_err("ECHO_FW_HIST: entries=%u\n", u4EchoFwCpuHistEntries);
+	pr_debug("ECHO_FW_HIST: entries=%u\n", u4EchoFwCpuHistEntries);
 	for (i = 0; i < u4EchoFwCpuHistEntries && i < 16; i++) {
 		u4Best = i;
 		for (j = i + 1; j < u4EchoFwCpuHistEntries; j++) {
@@ -1050,7 +1050,7 @@ static VOID echoWlanCpuHistDump(VOID)
 			arEchoFwCpuHist[i] = arEchoFwCpuHist[u4Best];
 			arEchoFwCpuHist[u4Best] = rTmp;
 		}
-		pr_err("ECHO_FW_HIST: rank=%u addr=0x%08x count=%u first=%lu last=%lu\n",
+		pr_debug("ECHO_FW_HIST: rank=%u addr=0x%08x count=%u first=%lu last=%lu\n",
 		       i, arEchoFwCpuHist[i].u4Address, arEchoFwCpuHist[i].u4Count,
 		       arEchoFwCpuHist[i].ulFirstJiffies, arEchoFwCpuHist[i].ulLastJiffies);
 	}
@@ -1068,7 +1068,7 @@ static VOID echoWlanHifSnapshot(IN P_ADAPTER_T prAdapter, IN const char *pszStag
 	HAL_MCR_RD(prAdapter, MCR_H2DSM0R, &h2d);
 	HAL_MCR_RD(prAdapter, MCR_D2HRM0R, &d2h0);
 	HAL_MCR_RD(prAdapter, MCR_D2HRM1R, &d2h1);
-	pr_err("ECHO_FW_STATE: %s WCIR=0x%08x WHLPCR=0x%08x WHISR=0x%08x "
+	pr_debug("ECHO_FW_STATE: %s WCIR=0x%08x WHLPCR=0x%08x WHISR=0x%08x "
 	       "WHIER=0x%08x WASR=0x%08x H2DSM0=0x%08x D2HRM0=0x%08x D2HRM1=0x%08x cpu=%u jiffies=%lu\n",
 	       pszStage, wc, lp, whisr, whier, wasr, h2d, d2h0, d2h1,
 	       raw_smp_processor_id(), jiffies);
@@ -1374,11 +1374,11 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 			u4Status = WLAN_STATUS_FAILURE;
 			break;
 		}
-		pr_err("ECHO_WLAN_HIF: driver-own acknowledged, before nicInitializeAdapter cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_HIF: driver-own acknowledged, before nicInitializeAdapter cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		/* 4 <1> Initialize the Adapter */
 		u4Status = nicInitializeAdapter(prAdapter);
-		pr_err("ECHO_WLAN_HIF: after nicInitializeAdapter status=%u cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_HIF: after nicInitializeAdapter status=%u cpu=%u jiffies=%lu\n",
 		       u4Status, raw_smp_processor_id(), jiffies);
 		if (u4Status != WLAN_STATUS_SUCCESS) {
 			DBGLOG(INIT, ERROR, "nicInitializeAdapter failed!\n");
@@ -1389,22 +1389,22 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 		/* init wake lock before interrupt enable and tx thread */
 		KAL_WAKE_LOCK_INIT(prAdapter, &prAdapter->rTxThreadWakeLock, "WLAN TX THREAD");
 
-		pr_err("ECHO_WLAN_HIF: before nicInitSystemService cpu=%u jiffies=%lu\n", raw_smp_processor_id(), jiffies);
+		pr_debug("ECHO_WLAN_HIF: before nicInitSystemService cpu=%u jiffies=%lu\n", raw_smp_processor_id(), jiffies);
 		/* 4 <2> Initialize System Service (MGMT Memory pool and STA_REC) */
 		nicInitSystemService(prAdapter);
-		pr_err("ECHO_WLAN_HIF: after nicInitSystemService cpu=%u jiffies=%lu\n", raw_smp_processor_id(), jiffies);
+		pr_debug("ECHO_WLAN_HIF: after nicInitSystemService cpu=%u jiffies=%lu\n", raw_smp_processor_id(), jiffies);
 
-		pr_err("ECHO_WLAN_HIF: before nicTxInitialize cpu=%u jiffies=%lu\n", raw_smp_processor_id(), jiffies);
+		pr_debug("ECHO_WLAN_HIF: before nicTxInitialize cpu=%u jiffies=%lu\n", raw_smp_processor_id(), jiffies);
 		/* 4 <3> Initialize Tx */
 		nicTxInitialize(prAdapter);
-		pr_err("ECHO_WLAN_HIF: after nicTxInitialize cpu=%u jiffies=%lu\n", raw_smp_processor_id(), jiffies);
+		pr_debug("ECHO_WLAN_HIF: after nicTxInitialize cpu=%u jiffies=%lu\n", raw_smp_processor_id(), jiffies);
 		wlanDefTxPowerCfg(prAdapter);
 
 		/* 4 <4> Initialize Rx */
-		pr_err("ECHO_WLAN_STAGE: 100 enter RX init cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 100 enter RX init cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		nicRxInitialize(prAdapter);
-		pr_err("ECHO_WLAN_STAGE: 101 exit RX init cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 101 exit RX init cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 
 #if CFG_ENABLE_FW_DOWNLOAD
@@ -1415,21 +1415,21 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 		}
 
 		/* 1. disable interrupt, download is done by polling mode only */
-		pr_err("ECHO_WLAN_STAGE: 102 before disable IRQ cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 102 before disable IRQ cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		nicDisableInterrupt(prAdapter);
-		pr_err("ECHO_WLAN_STAGE: 103 after disable IRQ cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 103 after disable IRQ cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 
 		/* 2. Initialize Tx Resource to fw download state */
-		pr_err("ECHO_WLAN_STAGE: 104 before reset download TX resource cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 104 before reset download TX resource cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		nicTxInitResetResource(prAdapter);
-		pr_err("ECHO_WLAN_STAGE: 105 after reset download TX resource cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 105 after reset download TX resource cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 
 		/* 3. FW download here */
-		pr_err("ECHO_WLAN_STAGE: 110 enter firmware download size=%u load=0x%08x buf=%p cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 110 enter firmware download size=%u load=0x%08x buf=%p cpu=%u jiffies=%lu\n",
 		       u4FwImageFileLength, prRegInfo->u4LoadAddress, pvFwImageMapFile,
 		       raw_smp_processor_id(), jiffies);
 		u4FwLoadAddr = prRegInfo->u4LoadAddress;
@@ -1437,7 +1437,7 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 #if CFG_ENABLE_FW_DIVIDED_DOWNLOAD
 		/* 3a. parse file header for decision of divided firmware download or not */
 		prFwHead = (P_FIRMWARE_DIVIDED_DOWNLOAD_T) pvFwImageMapFile;
-		pr_err("ECHO_FW_IMAGE: magic=0x%08x crc=0x%08x entries=%u load=0x%08x size=%u cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_FW_IMAGE: magic=0x%08x crc=0x%08x entries=%u load=0x%08x size=%u cpu=%u jiffies=%lu\n",
 		       prFwHead->u4Signature, prFwHead->u4CRC, prFwHead->u4NumOfEntries,
 		       u4FwLoadAddr, u4FwImageFileLength, raw_smp_processor_id(), jiffies);
 
@@ -1454,7 +1454,7 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 			DBGLOG(INIT, TRACE, "wlanAdapterStart(): fgValidHead == TRUE\n");
 
 			for (i = 0; i < prFwHead->u4NumOfEntries; i++) {
-				pr_err("ECHO_FW_SECTION: index=%u offset=0x%08x target=0x%08x length=%u\n",
+				pr_debug("ECHO_FW_SECTION: index=%u offset=0x%08x target=0x%08x length=%u\n",
 				       i, prFwHead->arSection[i].u4Offset,
 				       prFwHead->arSection[i].u4DestAddr,
 				       prFwHead->arSection[i].u4Length);
@@ -1462,7 +1462,7 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 #if CFG_START_ADDRESS_IS_1ST_SECTION_ADDR
 				if (i == 0) {
 					prRegInfo->u4StartAddress = prFwHead->arSection[i].u4DestAddr;
-					pr_err("ECHO_FW_START_ADDR: first_section=0x%08x\n",
+					pr_debug("ECHO_FW_START_ADDR: first_section=0x%08x\n",
 					       prRegInfo->u4StartAddress);
 					DBGLOG(INIT, TRACE,
 					       "wlanAdapterStart(): FW start address 0x%08x\n",
@@ -1537,12 +1537,12 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 
 		if (u4Status != WLAN_STATUS_SUCCESS)
 			break;
-		pr_err("ECHO_WLAN_STAGE: 112 firmware download complete status=%u cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 112 firmware download complete status=%u cpu=%u jiffies=%lu\n",
 		       u4Status, raw_smp_processor_id(), jiffies);
 		echoWlanHifSnapshot(prAdapter, "after-download");
 #if !CFG_ENABLE_FW_DOWNLOAD_ACK
 		/* Send INIT_CMD_ID_QUERY_PENDING_ERROR command and wait for response */
-		pr_err("ECHO_WLAN_STAGE: 113 before firmware query-status cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 113 before firmware query-status cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		if (wlanImageQueryStatus(prAdapter) != WLAN_STATUS_SUCCESS) {
 			DBGLOG(INIT, ERROR, "Firmware download failed!\n");
@@ -1554,12 +1554,12 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 		/* 4. send Wi-Fi Start command */
 		echoWlanCpuHistReset();
 		echoWlanPersistStage(ECHO_WLAN_PERSIST_DOWNLOAD);
-		pr_err("ECHO_WLAN_STAGE: 114 firmware download/ACK path complete cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 114 firmware download/ACK path complete cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		echoWlanHifSnapshot(prAdapter, "before-start");
 		echoWlanExecutionSnapshot(prAdapter, "before-start");
 		DBGLOG(INIT, INFO, "<wifi> send Wi-Fi Start command\n");
-		pr_err("ECHO_WLAN_STAGE: 115 before Wi-Fi start command addr=0x%08x enable=%u cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 115 before Wi-Fi start command addr=0x%08x enable=%u cpu=%u jiffies=%lu\n",
 		       prRegInfo->u4StartAddress, CFG_OVERRIDE_FW_START_ADDRESS,
 		       raw_smp_processor_id(), jiffies);
 #if CFG_OVERRIDE_FW_START_ADDRESS
@@ -1568,17 +1568,17 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 		wlanConfigWifiFunc(prAdapter, FALSE, 0);
 #endif
 		echoWlanPersistStage(ECHO_WLAN_PERSIST_START);
-		pr_err("ECHO_WLAN_STAGE: 116 after Wi-Fi start command cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 116 after Wi-Fi start command cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		echoWlanHifSnapshot(prAdapter, "after-start");
 #endif
 
-		pr_err("ECHO_WLAN_STAGE: 120 enter firmware-ready wait cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 120 enter firmware-ready wait cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		echoWlanPersistStage(ECHO_WLAN_PERSIST_READY_POLL);
 		/* Keep the ready-boundary candidate low-noise; no pre-poll MMIO warmup. */
 		u4EchoFwCpuHistEntries = 0;
-		pr_err("ECHO_WLAN_STAGE: 120 histogram warmup skipped cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 120 histogram warmup skipped cpu=%u jiffies=%lu\n",
 		       raw_smp_processor_id(), jiffies);
 		DBGLOG(INIT, TRACE, "wlanAdapterStart(): Waiting for Ready bit..\n");
 		/* 4 <5> check Wi-Fi FW asserts ready bit */
@@ -1587,7 +1587,7 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 			if (i == 0)
 				wmt_plat_dump_ap_state("before-ready-read");
 			if (i < 5 || (i % 100) == 0)
-				pr_err("ECHO_WLAN_STAGE: 121 ready poll before read iter=%u mask=0x%08x cpu=%u jiffies=%lu\n",
+				pr_debug("ECHO_WLAN_STAGE: 121 ready poll before read iter=%u mask=0x%08x cpu=%u jiffies=%lu\n",
 				       i, (UINT_32) WCIR_WLAN_READY, raw_smp_processor_id(), jiffies);
 			aee_rr_rec_fiq_step(0xFC);
 			HAL_MCR_RD(prAdapter, MCR_WCIR, &u4Value);
@@ -1599,29 +1599,29 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 				HAL_MCR_RD(prAdapter, MCR_D2HRM1R, &u4PollD2h1);
 				if ((u4PollCpupcr & 0xf0000000) == 0xf0000000)
 					echoWlanPersistStage(ECHO_WLAN_PERSIST_MAIN_EXEC);
-				pr_err("ECHO_FW_POLL: iter=%u CPUPCR=0x%08x WCIR=0x%08x "
+				pr_debug("ECHO_FW_POLL: iter=%u CPUPCR=0x%08x WCIR=0x%08x "
 				       "D2HRM0=0x%08x D2HRM1=0x%08x cpu=%u jiffies=%lu\n",
 				       i, u4PollCpupcr, u4Value, u4PollD2h0, u4PollD2h1,
 				       raw_smp_processor_id(), jiffies);
 			}
 			if (i < 5 || (i % 100) == 0)
-				pr_err("ECHO_WLAN_STAGE: 121 ready poll after read iter=%u WCIR=0x%08x mask=0x%08x cpu=%u jiffies=%lu\n",
+				pr_debug("ECHO_WLAN_STAGE: 121 ready poll after read iter=%u WCIR=0x%08x mask=0x%08x cpu=%u jiffies=%lu\n",
 				       i, u4Value, (UINT_32) WCIR_WLAN_READY, raw_smp_processor_id(), jiffies);
 
 			if (u4Value & WCIR_WLAN_READY) {
-				pr_err("ECHO_WLAN_STAGE: 121 ready asserted iter=%u WCIR=0x%08x cpu=%u jiffies=%lu\n",
+				pr_debug("ECHO_WLAN_STAGE: 121 ready asserted iter=%u WCIR=0x%08x cpu=%u jiffies=%lu\n",
 				       i, u4Value, raw_smp_processor_id(), jiffies);
 				break;
 			} else {
 				if (i < 5)
-					pr_err("ECHO_WLAN_STAGE: 121 before card/bus check iter=%u cpu=%u jiffies=%lu\n",
+					pr_debug("ECHO_WLAN_STAGE: 121 before card/bus check iter=%u cpu=%u jiffies=%lu\n",
 					       i, raw_smp_processor_id(), jiffies);
 				if (kalIsCardRemoved(prAdapter->prGlueInfo) == TRUE || fgIsBusAccessFailed == TRUE) {
 					u4Status = WLAN_STATUS_FAILURE;
 					break;
 				}
 				if (i < 5)
-					pr_err("ECHO_WLAN_STAGE: 121 card/bus check passed iter=%u cpu=%u jiffies=%lu\n",
+					pr_debug("ECHO_WLAN_STAGE: 121 card/bus check passed iter=%u cpu=%u jiffies=%lu\n",
 					       i, raw_smp_processor_id(), jiffies);
 				if (i >= CFG_RESPONSE_POLLING_TIMEOUT) {
 					UINT_32 u4MailBox0;
@@ -1635,17 +1635,17 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 				}
 				i++;
 				if (i <= 5)
-					pr_err("ECHO_WLAN_STAGE: 121 before ready sleep iter=%u cpu=%u jiffies=%lu\n",
+					pr_debug("ECHO_WLAN_STAGE: 121 before ready sleep iter=%u cpu=%u jiffies=%lu\n",
 					       i, raw_smp_processor_id(), jiffies);
 				kalMsleep(10);
 				if (i <= 5)
-					pr_err("ECHO_WLAN_STAGE: 121 after ready sleep iter=%u cpu=%u jiffies=%lu\n",
+					pr_debug("ECHO_WLAN_STAGE: 121 after ready sleep iter=%u cpu=%u jiffies=%lu\n",
 					       i, raw_smp_processor_id(), jiffies);
 			}
 		}
 
 		echoWlanCpuHistDump();
-		pr_err("ECHO_WLAN_STAGE: 122 firmware-ready wait exit status=%u WCIR=0x%08x iter=%u cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_WLAN_STAGE: 122 firmware-ready wait exit status=%u WCIR=0x%08x iter=%u cpu=%u jiffies=%lu\n",
 		       u4Status, u4Value, i, raw_smp_processor_id(), jiffies);
 		if (u4Status == WLAN_STATUS_SUCCESS) {
 			/* 1. reset interrupt status */
@@ -1657,25 +1657,25 @@ wlanAdapterStart(IN P_ADAPTER_T prAdapter,
 			nicTxResetResource(prAdapter);
 
 			/* 3. query for permanent address by polling */
-			pr_err("ECHO_WLAN_STAGE: 130 before permanent-address command cpu=%u jiffies=%lu\n",
+			pr_debug("ECHO_WLAN_STAGE: 130 before permanent-address command cpu=%u jiffies=%lu\n",
 			       raw_smp_processor_id(), jiffies);
 			wlanQueryPermanentAddress(prAdapter);
-			pr_err("ECHO_WLAN_STAGE: 131 after permanent-address command cpu=%u jiffies=%lu\n",
+			pr_debug("ECHO_WLAN_STAGE: 131 after permanent-address command cpu=%u jiffies=%lu\n",
 			       raw_smp_processor_id(), jiffies);
 
 #if (CFG_SUPPORT_NIC_CAPABILITY == 1)
 			/* 4. query for NIC capability */
-			pr_err("ECHO_WLAN_STAGE: 132 before NIC capability command cpu=%u jiffies=%lu\n",
+			pr_debug("ECHO_WLAN_STAGE: 132 before NIC capability command cpu=%u jiffies=%lu\n",
 			       raw_smp_processor_id(), jiffies);
 			wlanQueryNicCapability(prAdapter);
-			pr_err("ECHO_WLAN_STAGE: 133 after NIC capability command cpu=%u jiffies=%lu\n",
+			pr_debug("ECHO_WLAN_STAGE: 133 after NIC capability command cpu=%u jiffies=%lu\n",
 			       raw_smp_processor_id(), jiffies);
 #endif
 			/* 4.1 query for compiler flags */
-			pr_err("ECHO_WLAN_STAGE: 134 before compiler-flags command cpu=%u jiffies=%lu\n",
+			pr_debug("ECHO_WLAN_STAGE: 134 before compiler-flags command cpu=%u jiffies=%lu\n",
 			       raw_smp_processor_id(), jiffies);
 			wlanQueryCompileFlags(prAdapter);
-			pr_err("ECHO_WLAN_STAGE: 135 after compiler-flags command cpu=%u jiffies=%lu\n",
+			pr_debug("ECHO_WLAN_STAGE: 135 after compiler-flags command cpu=%u jiffies=%lu\n",
 			       raw_smp_processor_id(), jiffies);
 
 			/* 5. Override network address */
@@ -3303,7 +3303,7 @@ WLAN_STATUS wlanConfigWifiFunc(IN P_ADAPTER_T prAdapter, IN BOOLEAN fgEnable, IN
 	prInitCmdWifiStart = (P_INIT_CMD_WIFI_START) (prInitHifTxHeader->rInitWifiCmd.aucBuffer);
 	prInitCmdWifiStart->u4Override = (fgEnable == TRUE ? 1 : 0);
 	prInitCmdWifiStart->u4Address = u4StartAddress;
-	pr_err("ECHO_FW_START_SUBMIT: cid=0x%02x seq=%u override=%u address=0x%08x info_len=%u cpu=%u jiffies=%lu\n",
+	pr_debug("ECHO_FW_START_SUBMIT: cid=0x%02x seq=%u override=%u address=0x%08x info_len=%u cpu=%u jiffies=%lu\n",
 	       prInitHifTxHeader->rInitWifiCmd.ucCID,
 	       prInitHifTxHeader->rInitWifiCmd.ucSeqNum,
 	       prInitCmdWifiStart->u4Override, prInitCmdWifiStart->u4Address,
@@ -3340,7 +3340,7 @@ WLAN_STATUS wlanConfigWifiFunc(IN P_ADAPTER_T prAdapter, IN BOOLEAN fgEnable, IN
 		mdelay(9);
 		echoWlanExecutionSnapshot(prAdapter, "after-start-10ms");
 
-		pr_err("ECHO_FW_START_SUBMIT: tx_port_return status=%u; no start-command ACK is waited by this path cpu=%u jiffies=%lu\n",
+		pr_debug("ECHO_FW_START_SUBMIT: tx_port_return status=%u; no start-command ACK is waited by this path cpu=%u jiffies=%lu\n",
 		       u4Status, raw_smp_processor_id(), jiffies);
 
 		break;
@@ -4202,7 +4202,7 @@ WLAN_STATUS wlanQueryNicCapability(IN P_ADAPTER_T prAdapter)
 	prAdapter->fgIsEepromUsed = (BOOLEAN) prEventNicCapability->ucEepromUsed;
 	prAdapter->fgIsEfuseValid = (BOOLEAN) prEventNicCapability->ucEfuseValid;
 	prAdapter->fgIsEmbbededMacAddrValid = (BOOLEAN) prEventNicCapability->ucMacAddrValid;
-	pr_err("ECHO_WIFI_CAP: feature_set=0x%08x hw_5g_disabled=%u eeprom=%u efuse=%u\n",
+	pr_debug("ECHO_WIFI_CAP: feature_set=0x%08x hw_5g_disabled=%u eeprom=%u efuse=%u\n",
 	       prEventNicCapability->ucFeatureSet,
 	       prEventNicCapability->ucHw5GBandDisabled,
 	       prEventNicCapability->ucEepromUsed,
