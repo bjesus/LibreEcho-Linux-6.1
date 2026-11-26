@@ -748,6 +748,13 @@ static enum usb_role musb_usb_role_sx_get(struct usb_role_switch *sw)
 {
 	struct mtk_glue *glue = usb_role_switch_get_drvdata(sw);
 
+	/*
+	 * douglas: no ID pin, so the OTG state machine never leaves "none"
+	 * while the controller is in fact a B-device with its gadget bound.
+	 * Report that as "device" so userspace (pmOS usb-signaller) acts on it.
+	 */
+	if (glue->role == USB_ROLE_NONE)
+		return USB_ROLE_DEVICE;
 	return glue->role;
 }
 

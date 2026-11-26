@@ -138,14 +138,14 @@ static int mtk_bt_hci_open(struct hci_dev *hdev)
 {
 	int result;
 
-	pr_info("ECHO_BT_HCI_OPEN: begin\n");
+	pr_debug("ECHO_BT_HCI_OPEN: begin\n");
 
 	result = mtk_wcn_wmt_func_on(WMTDRV_TYPE_BT);
 	if (result != MTK_WCN_BOOL_TRUE) {
 		pr_debug("ECHO_BT_HCI_OPEN: FUNC_ON failed ret=%d\n", result);
 		return -ENODEV;
 	}
-	pr_info("ECHO_BT_HCI_OPEN: FUNC_ON ok ready=%d\n",
+	pr_debug("ECHO_BT_HCI_OPEN: FUNC_ON ok ready=%d\n",
 		mtk_wcn_stp_is_ready());
 	if (mtk_wcn_stp_is_ready() == MTK_WCN_BOOL_FALSE) {
 		mtk_wcn_wmt_func_off(WMTDRV_TYPE_BT);
@@ -156,7 +156,7 @@ static int mtk_bt_hci_open(struct hci_dev *hdev)
 	 * Register the HCI RX sink here, after the transport is ready; registering
 	 * from BT_init() is too early and leaves stp_if_rx NULL. */
 	result = mtk_wcn_stp_register_if_rx(mtk_bt_hci_receive);
-	pr_info("ECHO_BT_HCI_OPEN: RX register ret=%d\n", result);
+	pr_debug("ECHO_BT_HCI_OPEN: RX register ret=%d\n", result);
 	if (result) {
 		BT_ERR_FUNC("HCI RX callback registration failed: %d\n", result);
 		mtk_wcn_wmt_func_off(WMTDRV_TYPE_BT);
@@ -165,7 +165,7 @@ static int mtk_bt_hci_open(struct hci_dev *hdev)
 
 	set_bit(HCI_RUNNING, &hdev->flags);
 	mtk_wcn_stp_set_bluez(1);
-	pr_info("ECHO_BT_HCI_OPEN: complete\n");
+	pr_debug("ECHO_BT_HCI_OPEN: complete\n");
 	return 0;
 }
 
@@ -190,10 +190,10 @@ static void mtk_bt_hci_work(struct work_struct *work)
 
 		skb_push(skb, 1);
 		skb->data[0] = pkt_type;
-		pr_info("ECHO_BT_HCI_TX: type=0x%02x len=%u\n", pkt_type, skb->len);
+		pr_debug("ECHO_BT_HCI_TX: type=0x%02x len=%u\n", pkt_type, skb->len);
 		result = mtk_wcn_stp_send_data(skb->data, skb->len,
 					       BT_TASK_INDX);
-		pr_info("ECHO_BT_HCI_TX: result=%d\n", result);
+		pr_debug("ECHO_BT_HCI_TX: result=%d\n", result);
 		if (result <= 0) {
 			hci->hdev->stat.err_tx++;
 			skb_pull(skb, 1);
@@ -243,7 +243,7 @@ static void mtk_bt_hci_receive(const UINT8 *data, INT32 size)
 
 	if (!mtk_hci.hdev || size <= 0)
 		return;
-	pr_info("ECHO_BT_HCI_RX: size=%d type=0x%02x\n", size, data[0]);
+	pr_debug("ECHO_BT_HCI_RX: size=%d type=0x%02x\n", size, data[0]);
 
 	/* The STP transport delivers a complete HCI frame whose first byte is
 	 * the packet type (command/ACL/SCO/event).  Modern kernels removed
@@ -290,7 +290,7 @@ static void mtk_bt_hci_reg_work(struct work_struct *work)
 		pr_debug("ECHO_BT_HCI: STP never became ready, HCI not registered\n");
 		return;
 	}
-	pr_info("ECHO_BT_HCI: STP ready after %d polls, registering hci\n", mtk_hci_reg_tries);
+	pr_debug("ECHO_BT_HCI: STP ready after %d polls, registering hci\n", mtk_hci_reg_tries);
 	result = hci_register_dev(mtk_hci.hdev);
 	if (result) {
 		pr_debug("ECHO_BT_HCI: hci_register_dev failed %d\n", result);
