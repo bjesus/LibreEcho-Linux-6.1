@@ -758,7 +758,7 @@ static enum usb_role musb_usb_role_sx_get(struct usb_role_switch *sw)
 	return glue->role;
 }
 
-static int mtk_otg_switch_init(struct mtk_glue *glue)
+static int mtk_otg_switch_init(struct mtk_glue *glue, struct device *controller)
 {
 	struct usb_role_switch_desc role_sx_desc = { 0 };
 
@@ -771,8 +771,10 @@ static int mtk_otg_switch_init(struct mtk_glue *glue)
 	 * douglas: register the switch on the musb controller device (the one
 	 * that owns the UDC) rather than on the glue. Userspace (postmarketOS
 	 * usb-signaller) resolves the gadget as <role-switch>/device/udc/.
+	 * glue->musb_pdev is not assigned yet at this point (we run inside the
+	 * child probe), so the caller passes musb->controller.
 	 */
-	glue->role_sw = usb_role_switch_register(&glue->musb_pdev->dev, &role_sx_desc);
+	glue->role_sw = usb_role_switch_register(controller, &role_sx_desc);
 
 	return PTR_ERR_OR_ZERO(glue->role_sw);
 }
@@ -955,7 +957,7 @@ static int mtk_musb_init(struct musb *musb)
 	musb_writew(musb->mregs, MUSB_RXTOGEN, MTK_TOGGLE_EN);
 
 	if (musb->port_mode == MUSB_OTG) {
-		ret = mtk_otg_switch_init(glue);
+		ret = mtk_otg_switch_init(glue, musb->controller);
 		if (ret)
 			return ret;
 	}
