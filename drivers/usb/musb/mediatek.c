@@ -1179,7 +1179,13 @@ static int mtk_musb_probe(struct platform_device *pdev)
 		break;
 	case USB_DR_MODE_OTG:
 		glue->phy_mode = PHY_MODE_USB_OTG;
-		glue->role = USB_ROLE_NONE;
+		/*
+		 * douglas: the tablet has no ID pin wiring, so OTG only ever runs
+		 * as a B-device. Start as "device" instead of "none": userspace
+		 * (postmarketOS usb-signaller) reads the role switch and refuses to
+		 * configure the gadget when the role is unknown.
+		 */
+		glue->role = USB_ROLE_DEVICE;
 		break;
 	default:
 		dev_err(&pdev->dev, "Error 'dr_mode' property\n");
