@@ -767,7 +767,12 @@ static int mtk_otg_switch_init(struct mtk_glue *glue)
 	role_sx_desc.allow_userspace_control = true;
 	role_sx_desc.fwnode = dev_fwnode(glue->dev);
 	role_sx_desc.driver_data = glue;
-	glue->role_sw = usb_role_switch_register(glue->dev, &role_sx_desc);
+	/*
+	 * douglas: register the switch on the musb controller device (the one
+	 * that owns the UDC) rather than on the glue. Userspace (postmarketOS
+	 * usb-signaller) resolves the gadget as <role-switch>/device/udc/.
+	 */
+	glue->role_sw = usb_role_switch_register(&glue->musb_pdev->dev, &role_sx_desc);
 
 	return PTR_ERR_OR_ZERO(glue->role_sw);
 }
