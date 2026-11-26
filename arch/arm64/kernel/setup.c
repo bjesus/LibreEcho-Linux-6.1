@@ -220,7 +220,14 @@ static void __init douglas_pick_lk_cmdline(const void *fdt, int node)
 
 		while (p < end && *p != ' ')
 			p++;
-		if (p - tok > 5 && !strncmp(tok, "pmos", 4) && (tok[4] == '_' || tok[4] == '.')) {
+		/*
+		 * Forward pmos.* debug switches, but not the pmos_*_uuid pair: a
+		 * boot.img from one build must still boot a rootfs from another,
+		 * and without the UUIDs the initramfs falls back to the pmOS_boot
+		 * and pmOS_root partition labels.
+		 */
+		if (p - tok > 5 && !strncmp(tok, "pmos", 4) && (tok[4] == '_' || tok[4] == '.') &&
+		    !strnstr(tok, "_uuid=", p - tok)) {
 			size_t have = strlen(douglas_lk_extra_cmdline);
 
 			if (have + 1 + (p - tok) < sizeof(douglas_lk_extra_cmdline)) {
