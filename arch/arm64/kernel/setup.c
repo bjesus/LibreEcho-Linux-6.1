@@ -199,7 +199,42 @@ static u64 __init lk_chosen_u64(const void *fdt, int node, const char *name)
 	return 0;
 }
 
-/* Read linux,initrd-start/end from the FDT LK handed over (x0). */
+static char douglas_lk_extra_cmdline[COMMAND_LINE_SIZE] __initdata;
+
+/*
+ * The LK bootargs are the vendor's (console=ttyMT0, root=/dev/ram, ...) plus
+ * whatever the boot.img cmdline carried. Keep only the postmarketOS tokens
+ * (pmos_*, pmos.*) so the initramfs can find its partitions by UUID.
+ */
+static void __init douglas_pick_lk_cmdline(const void *fdt, int node)
+{
+	int len;
+	const char *args = fdt_getprop(fdt, node, "bootargs", &len);
+	const char *p, *end;
+
+	if (!args || len <= 0)
+		return;
+	end = args + strnlen(args, len);
+	for (p = args; p < end;) {
+		const char *tok = p;
+
+		while (p < end && *p != ' ')
+			p++;
+		if (p - tok > 5 && !strncmp(tok, "pmos", 4) && (tok[4] == '_' || tok[4] == '.')) {
+			size_t have = strlen(douglas_lk_extra_cmdline);
+
+			if (have + 1 + (p - tok) < sizeof(douglas_lk_extra_cmdline)) {
+				douglas_lk_extra_cmdline[have] = ' ';
+				memcpy(douglas_lk_extra_cmdline + have + 1, tok, p - tok);
+				douglas_lk_extra_cmdline[have + 1 + (p - tok)] = '\0';
+			}
+		}
+		while (p < end && *p == ' ')
+			p++;
+	}
+}
+
+/* Read linux,initrd-start/end (and the pmos_* bootargs) from the FDT LK handed over (x0). */
 static void __init douglas_initrd_from_lk_fdt(phys_addr_t lk_phys)
 {
 	int size = 0, node;
@@ -214,6 +249,7 @@ static void __init douglas_initrd_from_lk_fdt(phys_addr_t lk_phys)
 	node = fdt_path_offset(fdt, "/chosen");
 	if (node < 0)
 		return;
+	douglas_pick_lk_cmdline(fdt, node);
 	start = lk_chosen_u64(fdt, node, "linux,initrd-start");
 	end = lk_chosen_u64(fdt, node, "linux,initrd-end");
 	if (start && end > start) {
@@ -450,6 +486,8 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	setup_machine_fdt(__fdt_pointer);
 	kmark('B');			/* DTB scanned, memory/chosen known */
+	if (douglas_lk_extra_cmdline[0])
+		strlcat(boot_command_line, douglas_lk_extra_cmdline, COMMAND_LINE_SIZE);
 
 	/*
 	 * NOTE: do NOT touch the MTK RGU watchdog here. Early experiments

@@ -230,7 +230,7 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;
-		bootargs = "clk_ignore_unused regulator_ignore_unused pd_ignore_unused irqchip.gicv2_force_probe=1 console=tty0 ignore_loglevel loglevel=8 panic=1";
+		bootargs = "clk_ignore_unused regulator_ignore_unused pd_ignore_unused irqchip.gicv2_force_probe=1 console=tty0 loglevel=4 panic=1";
 
 		framebuffer0: framebuffer@98600000 {
 			compatible = "simple-framebuffer";
